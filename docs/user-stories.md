@@ -89,11 +89,15 @@ As the Owner, I want a configurable maximum duration to avoid accidentally conve
 
 ## Epic 5 — Deployment
 
-### US-16 Self-host on a private computer, reachable over the LAN (M)
-As the Owner, I want to run the service on my own computer or home server (e.g. with Docker), configured entirely by environment variables, and reach it from other devices on my LAN (phone, laptop).
+### US-16 Run on my own computer via localhost (M)
+As the Owner, I want to run the service on my own computer (JAR or Docker), configured entirely by environment variables, and use it from a browser on that same machine at `http://localhost:8080`.
 - No cloud dependency other than Google (login and Drive) and YouTube.
-- Client devices need no software installed; a browser (or any HTTP client) is enough.
-- Reachable via a stable HTTPS hostname on the LAN (needed for Google login; see tech spec §9).
+- Google login works over plain `http://localhost` (no domain or certificate needed).
+
+### US-16b Access from other devices on the LAN (S, phase 2)
+As the Owner, I want to reach the service from other devices on my LAN (phone, laptop) without installing anything on them.
+- Requires a stable HTTPS hostname (needed for Google login); see tech spec §9, phase 2.
+- Planned only if the MVP proves useful.
 
 ### US-17 Move to the cloud later (S)
 As the Owner, I want the same artifact to be deployable on a cloud host without code changes, so I can reach it from anywhere over HTTPS.

@@ -115,7 +115,9 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 ## 9. Deployment
 
-- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Decision: **own domain name + Caddy with a Let's Encrypt certificate**. Client devices need **nothing installed**: any browser on the LAN opens `https://yt2pod.<your-domain>` directly. (Tailscale was considered and discarded: it requires the app on every client device, or Funnel, which publishes the service on the internet.)
+- **Phase 1 — MVP, localhost only:** run on the Owner's computer (`java -jar` or `docker compose`) and use it at `http://localhost:8080`. Google allows plain `http` redirect URIs for `localhost`, so Google login needs no domain, certificate or proxy. Redirect URI: `http://localhost:8080/login/oauth2/code/google`. Only outbound internet access is required (Google, YouTube). Limitation: only usable from the host machine itself. If Docker is used, publish the port as `127.0.0.1:8080:8080`, and the browser must use `localhost` (not the machine's IP or hostname) for login to work.
+- **Phase 2 — LAN access (only if the MVP proves useful):** Google login needs an HTTPS redirect URI with a real domain name; Google only allows plain `http` for `localhost` and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names. Plan: **own domain name + Caddy with a Let's Encrypt certificate**. Client devices need **nothing installed** (Tailscale was considered and discarded: it requires the app on every client, or Funnel, which publishes the service on the internet).
+ name + Caddy with a Let's Encrypt certificate**. Client devices need **nothing installed**: any browser on the LAN opens `https://yt2pod.<your-domain>` directly. (Tailscale was considered and discarded: it requires the app on every client device, or Funnel, which publishes the service on the internet.)
   - **Domain:** a domain or subdomain you control (e.g. `yt2pod.example.com`). Cost is a few euros/year; a free subdomain service also works.
   - **DNS:** make `yt2pod.<your-domain>` resolve to the server's **LAN IP** (give it a static/reserved IP in the router). Either a public A record pointing to the private IP, or, preferably, a local DNS override on the router/Pi-hole. Some routers block public names that resolve to private IPs ("DNS rebinding protection"); the local override avoids that.
   - **Certificate:** Caddy obtains and renews a Let's Encrypt certificate using the **DNS-01 challenge** (needs a Caddy build with the plugin for your DNS provider and an API token). No inbound port is opened and the service is never exposed to the internet.
@@ -123,7 +125,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
   - **Google Cloud OAuth client:** redirect URI `https://yt2pod.<your-domain>/login/oauth2/code/google`.
   - `http://localhost:8080` still works on the host itself for development (Google allows `http` for `localhost`).
   The service itself stays HTTP internally; Caddy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
-- **Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
+- **Phase 3 — Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
 
 ## 10. Security & privacy
 
@@ -143,12 +145,13 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 ## 12. Suggested milestones
 
-1. Skeleton: Spring Boot project, Google login + allowlist, health.
+1. Skeleton: Spring Boot project, Google login on `localhost` + allowlist, health.
 2. `YtDlpAudioExtractor` + URL validation (CLI-level tests).
 3. `GoogleDriveUploader` + folder handling.
 4. Async job flow + REST API + simple web page.
-5. Dockerfile, docs, home-server deployment.
-6. Cloud trial and hardening.
+5. MVP packaging: runnable JAR / Dockerfile, README (localhost).
+6. Phase 2: LAN access with domain + Caddy (if useful).
+7. Phase 3: cloud trial and hardening.
 
 ## Sources
 
