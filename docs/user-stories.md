@@ -92,7 +92,7 @@ As the Owner, I want a configurable maximum duration to avoid accidentally conve
 ### US-16 Self-host on a private computer, reachable over the LAN (M)
 As the Owner, I want to run the service on my own computer or home server (e.g. with Docker), configured entirely by environment variables, and reach it from other devices on my LAN (phone, laptop).
 - No cloud dependency other than Google (login and Drive) and YouTube.
-- Reachable via a stable hostname over HTTPS (needed for Google login; see tech spec §9).
+- Reachable via a stable HTTPS hostname provided by Tailscale (needed for Google login; see tech spec §9).
 
 ### US-17 Move to the cloud later (S)
 As the Owner, I want the same artifact to be deployable on a cloud host without code changes, so I can reach it from anywhere over HTTPS.

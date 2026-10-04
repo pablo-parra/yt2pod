@@ -115,10 +115,12 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 ## 9. Deployment
 
-- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Options, simplest first:
-  1. **Tailscale** (free for personal use): the machine gets an HTTPS name via `tailscale cert`/`serve`; reachable from the LAN and from outside, no port opening.
-  2. **Own domain** (a cheap one, or a subdomain) whose DNS A record points to the LAN IP (or local DNS override), with a Let's Encrypt certificate obtained through the DNS-01 challenge (no inbound exposure), served by a reverse proxy (Caddy/Traefik) in front of Spring Boot.
-  3. **Fallback for the machine itself only:** `http://localhost:8080` works without HTTPS.
+- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Decision: **Tailscale** provides the HTTPS name.
+  - One-off setup: install Tailscale on the host and on each client device (phone, laptop); in the Tailscale admin console enable **MagicDNS** and **HTTPS certificates**.
+  - On the host: `tailscale serve --bg --https=443 http://localhost:8080` exposes the app at `https://<machine>.<tailnet>.ts.net` (certificate issued and renewed by Tailscale). Do **not** use Funnel; the service stays private to the tailnet.
+  - Google Cloud OAuth client: add redirect URI `https://<machine>.<tailnet>.ts.net/login/oauth2/code/google`. (To verify during setup: that Google accepts the `ts.net` domain as a redirect host; if not, fall back to an own domain + Caddy with a DNS-01 Let's Encrypt certificate.)
+  - Clients must be running Tailscale to reach the service, also when at home; traffic between devices on the same LAN is direct.
+  - `http://localhost:8080` still works on the host itself for development.
   The service itself stays HTTP internally; the proxy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
 - **Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
 
