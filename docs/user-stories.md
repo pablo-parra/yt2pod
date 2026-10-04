@@ -31,74 +31,68 @@ As the Owner, I want the service to renew Google access tokens by itself, so I n
 
 ### US-04 Submit a link through a web page (M)
 As a Client, I want a simple page where I paste a YouTube URL and press a button, so I can convert a video from any device without logging in.
+- On a phone or tablet the flow is manual: copy the link, open `http://<host>:8080`, paste it and press the button.
 - Works well on mobile browsers.
 
 ### US-05 Submit a link through an API (M)
-As a Client, I want a REST endpoint that accepts a YouTube URL, so I can call it from scripts or phone shortcuts.
+As a Client, I want a REST endpoint that accepts a YouTube URL, so I can call it from scripts.
 - Accepts `youtube.com/watch?v=…`, `youtu.be/…` and `m.youtube.com` forms.
 - Returns immediately with a job identifier (the conversion is asynchronous).
 
-### US-06 Send from the phone's "Share" menu (S)
-As a Client, I want to use the "Share" menu of the YouTube app or browser to send the video to yt2pod, without opening the page manually.
-- iOS: an Apple Shortcuts shortcut that receives the shared URL and calls the API.
-- Android: an app such as HTTP Shortcuts (or similar) that receives the shared URL and calls the API.
-- The project documents the setup steps and ready-to-use request examples. These shortcuts live on the client device; the web page itself needs nothing installed.
-- Works over plain HTTP on the LAN (no HTTPS required).
-
-### US-07 Link validation (M)
+### US-06 Link validation (M)
 As a Client, I want invalid or unsupported links to be rejected immediately with a clear error, so I don't wait for a job that cannot succeed.
 - Non-YouTube URLs are rejected.
-- Playlists, live streams and unavailable/private videos produce an explicit error (playlists: future story US-14).
+- Playlists, live streams and unavailable/private videos produce an explicit error (playlists: future story US-13).
 
 ---
 
 ## Epic 3 — Audio extraction & storage
 
-### US-08 Extract audio only (M)
+### US-07 Extract audio only (M)
 As a Client, I want only the audio extracted, so files are small and suitable for a podcast app.
 - No video data is retained after the job finishes.
 
-### US-09 Speech-oriented audio format (M)
+### US-08 Speech-oriented audio format (M)
 As the Owner, I want the audio saved in a small, widely supported format, since the content is spoken word rather than music.
 - Default: M4A/AAC, 64 kbps, mono (configurable bitrate, mono/stereo and format, e.g. MP3).
 - Quality is deliberately "enough", not the best available.
 
-### US-10 Save to a Google Drive folder (M)
+### US-09 Save to a Google Drive folder (M)
 As the Owner, I want the audio saved in a dedicated Drive folder so I can find it and import it into my podcatcher.
 - Folder name is configurable; created automatically if missing.
 - Filename derives from the video title (sanitized); name collisions never overwrite existing files.
 
-### US-11 Embedded metadata (S)
+### US-10 Embedded metadata (S)
 As the Owner, I want the file tagged with title, channel (as artist) and thumbnail (as cover art), so it displays well in the podcast app.
 
 ---
 
 ## Epic 4 — Feedback & operation
 
-### US-12 Job status (M)
+### US-11 Job status (M)
 As a Client, I want to see whether my conversion is queued, running, done or failed, so I know when the file is in Drive.
 - On success: Drive file name and a link.
 - On failure: a human-readable reason (video unavailable, Drive error, authorization revoked…).
 
-### US-13 Resilience to YouTube changes (S)
+### US-12 Resilience to YouTube changes (S)
 As the Owner, I want the extraction tool to be easy to update, so the service keeps working when YouTube changes.
 
-### US-14 Playlist / batch support (C)
+### US-13 Playlist / batch support (C)
 As a Client, I want to submit a playlist or several links and get one file per video.
 
-### US-15 Duration/size limit (C)
+### US-14 Duration/size limit (C)
 As the Owner, I want a configurable maximum duration/size to avoid converting huge videos by accident.
 
 ---
 
 ## Epic 5 — Deployment
 
-### US-16 Self-host on a private computer, available on the LAN (M)
+### US-15 Self-host on a private computer, available on the LAN (M)
 As the Owner, I want to run the service on my own computer or home server with Docker, configured entirely by environment variables, and reach it from any LAN device over `http://<host>:<port>`.
 - No cloud dependency other than Google Drive and YouTube.
 - No domain, certificate or reverse proxy required.
 
-### US-17 Move to the cloud later (C)
+### US-16 Move to the cloud later (C)
 As the Owner, I want the same image to be deployable on a cloud host later. Cloud exposure would require adding access control and HTTPS (not part of the MVP).
 
 ---
@@ -116,4 +110,5 @@ As the Owner, I want the same image to be deployable on a cloud host later. Clou
 - Importing the file into the podcatcher (manual).
 - Generating a podcast RSS feed.
 - Storing history of conversions or links.
+- "Share" menu integration, phone shortcuts and other extra client-side tooling.
 - Client authentication, HTTPS and domain setup (future, only if exposed beyond the LAN).

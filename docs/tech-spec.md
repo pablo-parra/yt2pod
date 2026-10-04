@@ -8,7 +8,7 @@ A Spring Boot (Java) web service for a private LAN. Any client device submits a 
 
 ```
 Phone / tablet / PC (no login, no install)
-        │  HTTP on LAN (page, API, share-sheet shortcut)
+        │  HTTP on LAN (web page or API)
         ▼
   Spring Boot ──► yt-dlp + ffmpeg (local process) ──► temp audio file
         │                                                   │
@@ -96,13 +96,7 @@ Flow:
 
 Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`.
 
-### Phone "Share" menu (US-06)
-
-The share sheet can only target **apps**. The plain-HTTP LAN page cannot appear there: browsers only let installed web apps (PWAs) receive shares, installing a PWA needs HTTPS, and iOS Safari does not support receiving shares at all. The solution is a small shortcut on the phone that calls the API over plain HTTP:
-- **iOS:** Apple *Shortcuts* app → new shortcut with "Show in Share Sheet" enabled (accepts URLs) → action "Get Contents of URL": `POST http://<host>:8080/api/conversions`, JSON body `{"url": <Shortcut Input>}` → show the result as a notification. Created once; then it appears in the Share menu of YouTube/Safari.
-- **Android:** *HTTP Shortcuts* (or Tasker) app: define a request with the same URL/JSON body, using the shared text as the `url` variable; it appears in the Share menu.
-- To make this easy, the endpoint also accepts a form-encoded or plain-text body, and the shared text may contain extra words around the URL (the first YouTube URL found is used).
-- The project will ship step-by-step instructions and example requests. The exact steps and plain-HTTP behavior of these apps are to be verified on real devices at implementation time. A later HTTPS phase could add a PWA with Web Share Target on Android.
+Phone/tablet clients use the web page manually (copy the link, open `http://<host>:8080`, paste, submit). Share-menu integration and shortcuts are out of scope.
 
 ## 7. yt-dlp invocation
 
@@ -135,7 +129,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 ## 9. Deployment
 
-- **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, port 8080 published to the LAN; clients use `http://<host-ip-or-name>:8080`. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so shortcuts keep working. **Never port-forward this service to the internet** (it has no authentication).
+- **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, port 8080 published to the LAN; clients use `http://<host-ip-or-name>:8080`. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so the address stays stable. **Never port-forward this service to the internet** (it has no authentication).
 - **Phase 2 — Cloud (later, optional):** same image behind HTTPS with access control added (not designed here). YouTube may block datacenter IPs, possibly requiring a cookies/PO-token provider — validate early. In-memory jobs imply a single instance.
 - **Possible future HTTPS for LAN:** own domain + Caddy with a Let's Encrypt DNS-01 certificate (would also enable a PWA share target on Android). Not needed for the MVP.
 
@@ -150,8 +144,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 1. **YouTube anti-bot changes** (PO tokens, cookies, JS runtime) can break extraction at any time → keep yt-dlp updatable; isolate behind `AudioExtractor`.
 2. **Unauthenticated service on the LAN:** anyone on the network can use it and fill the Drive folder; accepted for the MVP, revisit if the network is shared/untrusted.
 3. **Refresh-token lifetime:** requires the OAuth app in *In production* status to avoid 7-day expiry; verify during setup.
-4. **Share-sheet shortcuts:** depend on third-party apps on Android and on the Shortcuts app on iOS; verify on real devices.
-5. **Cloud IP blocking** by YouTube.
+4. **Cloud IP blocking** by YouTube.
 6. **ToS/legal:** personal use only.
 
 ## 12. Suggested milestones
@@ -160,7 +153,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 2. `YtDlpAudioExtractor` + URL validation (tests with a fake process and a manual real run).
 3. One-off Google setup flow + `GoogleDriveUploader` + folder handling.
 4. Async job flow + REST API + simple web page.
-5. `docker compose` packaging, README, share-sheet shortcut instructions (iOS/Android).
+5. `docker compose` packaging, README.
 6. Optional: HTTPS for LAN, cloud trial.
 
 ## Sources
