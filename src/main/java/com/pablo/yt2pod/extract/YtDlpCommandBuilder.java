@@ -21,8 +21,12 @@ public class YtDlpCommandBuilder {
 		Yt2podProperties.Audio audio = properties.audio();
 		List<String> cmd = new ArrayList<>();
 		cmd.add(properties.extractor().ytDlpPath());
-		cmd.add("--ffmpeg-location");
-		cmd.add(properties.extractor().ffmpegPath());
+		String ffmpegPath = properties.extractor().ffmpegPath();
+		if (ffmpegPath.contains("/")) {
+			// yt-dlp treats this value as a path, so a bare "ffmpeg" must be left to the PATH lookup
+			cmd.add("--ffmpeg-location");
+			cmd.add(ffmpegPath);
+		}
 		cmd.add("--no-playlist");
 		cmd.add("-f");
 		cmd.add("bestaudio/best");

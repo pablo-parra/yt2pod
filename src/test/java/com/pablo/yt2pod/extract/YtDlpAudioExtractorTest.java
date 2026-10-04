@@ -93,6 +93,7 @@ class YtDlpAudioExtractorTest {
 			ERROR: [youtube] abc: Video unavailable | UNAVAILABLE
 			ERROR: [youtube] abc: This video has been removed by the uploader | UNAVAILABLE
 			ERROR: [youtube] abc: Sign in to confirm you're not a bot | BOT_CHECK
+			ERROR: Postprocessing: ffprobe and ffmpeg not found. Please install or provide the path using --ffmpeg-location | TOOL_NOT_FOUND
 			something completely different | UNKNOWN
 			""")
 	@DisplayName("US-11 failures are mapped to a human-readable reason")

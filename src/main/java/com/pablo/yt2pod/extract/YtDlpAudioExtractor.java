@@ -9,10 +9,14 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 import com.pablo.yt2pod.config.Yt2podProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class YtDlpAudioExtractor implements AudioExtractor {
+
+	private static final Logger log = LoggerFactory.getLogger(YtDlpAudioExtractor.class);
 
 	private final YoutubeUrlValidator validator;
 
@@ -46,6 +50,8 @@ public class YtDlpAudioExtractor implements AudioExtractor {
 		}
 		Path audio = findAudioFile(outputDir);
 		if (result.exitCode() != 0 || audio == null) {
+			// the output can contain the video id/title, so it is only logged at DEBUG
+			log.debug("yt-dlp exited with {}: {}", result.exitCode(), result.output());
 			throw new ExtractionException(classify(result.output()));
 		}
 		deleteEverythingExcept(outputDir, audio);
@@ -57,6 +63,9 @@ public class YtDlpAudioExtractor implements AudioExtractor {
 		String text = output.toLowerCase(Locale.ROOT);
 		if (text.contains("does not pass filter")) {
 			return ExtractionFailure.LIMIT_EXCEEDED;
+		}
+		if (text.contains("ffmpeg not found") || text.contains("ffprobe and ffmpeg not found")) {
+			return ExtractionFailure.TOOL_NOT_FOUND;
 		}
 		if (text.contains("private video")) {
 			return ExtractionFailure.PRIVATE;

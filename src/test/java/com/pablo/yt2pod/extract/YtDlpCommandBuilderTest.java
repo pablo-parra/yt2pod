@@ -73,6 +73,22 @@ class YtDlpCommandBuilderTest {
 	}
 
 	@Test
+	@DisplayName("US-12 a bare 'ffmpeg' is found through the PATH: no --ffmpeg-location (yt-dlp would read it as a path)")
+	void US12_bareFfmpegNameIsNotPassedAsLocation() {
+		assertThat(defaults()).doesNotContain("--ffmpeg-location");
+	}
+
+	@Test
+	@DisplayName("US-12 a configured ffmpeg path is passed with --ffmpeg-location")
+	void US12_configuredFfmpegPathIsPassed() {
+		var p = new Yt2podProperties(new Yt2podProperties.Google(null, null, null), new Yt2podProperties.Setup(false),
+				new Yt2podProperties.Drive("yt2pod"), new Yt2podProperties.Audio("m4a", "64K", true),
+				new Yt2podProperties.Jobs(2, Duration.ofHours(1)), new Yt2podProperties.Limits(Duration.ofHours(3)),
+				new Yt2podProperties.Extractor("yt-dlp", "/usr/local/bin/ffmpeg", Duration.ofMinutes(15)));
+		assertThat(build(p)).containsSequence("--ffmpeg-location", "/usr/local/bin/ffmpeg");
+	}
+
+	@Test
 	@DisplayName("US-13 never downloads playlists")
 	void US13_noPlaylist() {
 		assertThat(defaults()).contains("--no-playlist");
