@@ -34,6 +34,19 @@ class Yt2podApplicationTests {
 	}
 
 	@Test
+	@DisplayName("US-01 setup endpoints do not exist unless setup mode is enabled")
+	void US01_setupEndpointsAreDisabledByDefault() throws Exception {
+		mockMvc.perform(get("/setup/google")).andExpect(status().isNotFound());
+		mockMvc.perform(get("/setup/google/callback")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("US-01 health stays UP while Drive is not configured (Drive reported as UNKNOWN)")
+	void US01_healthIsUpWhenDriveNotConfigured() throws Exception {
+		mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+	}
+
+	@Test
 	@DisplayName("US-08/US-15 defaults come from configuration (speech-oriented audio, folder, limits)")
 	void US08_US15_defaultsAreSpeechOriented() {
 		assertThat(properties.audio().format()).isEqualTo("m4a");

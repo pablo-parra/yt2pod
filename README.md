@@ -21,4 +21,4 @@ docker compose up --build
 
 ## Status
 
-Milestone 1 (skeleton) done: project, typed configuration, health endpoint, Docker packaging. Next: yt-dlp extractor, Google Drive upload, job API and web page.
+Done: skeleton, yt-dlp extractor, one-off Google setup and Drive upload. Next: job API and web page (milestone 4), then an end-to-end run.
