@@ -57,7 +57,7 @@ Clients are anonymous; only the **service** authenticates to Google, as the Owne
 | Concern | Choice |
 |---|---|
 | Language / runtime | Java 21 (LTS) |
-| Framework | Spring Boot 3.x (latest stable at project start), Maven |
+| Framework | Spring Boot 4.1.x (latest stable at project start), Maven |
 | Web | Spring MVC + one static HTML page (vanilla JS) |
 | Security | None for Clients (trusted LAN); Spring Security not required in the MVP |
 | Async jobs | `ThreadPoolTaskExecutor` (bounded, configurable); in-memory job registry (`ConcurrentHashMap`) with TTL eviction |

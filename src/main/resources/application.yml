@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: yt2pod
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# Overridable with environment variables, e.g. YT2POD_AUDIO_BITRATE, GOOGLE_CLIENT_ID...
+yt2pod:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    refresh-token: ${GOOGLE_REFRESH_TOKEN:}
+  setup:
+    enabled: ${YT2POD_SETUP_ENABLED:false}
+  drive:
+    folder-name: ${YT2POD_DRIVE_FOLDER_NAME:yt2pod}
+  audio:
+    format: ${YT2POD_AUDIO_FORMAT:m4a}
+    bitrate: ${YT2POD_AUDIO_BITRATE:64K}
+    mono: ${YT2POD_AUDIO_MONO:true}
+  jobs:
+    max-concurrent: ${YT2POD_JOBS_MAX_CONCURRENT:2}
+    ttl: ${YT2POD_JOBS_TTL:1h}
+  limits:
+    max-duration: ${YT2POD_LIMITS_MAX_DURATION:3h}
+  extractor:
+    yt-dlp-path: ${YT2POD_YTDLP_PATH:yt-dlp}
+    ffmpeg-path: ${YT2POD_FFMPEG_PATH:ffmpeg}
