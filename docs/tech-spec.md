@@ -1,88 +1,108 @@
 # yt2pod — Technical Specification
 
-Status: draft v0.1 · Covers user stories in [user-stories.md](user-stories.md)
+Status: draft v0.2 · Covers user stories in [user-stories.md](user-stories.md)
 
 ## 1. Summary
 
-A Spring Boot (Java) web service. The Owner signs in with Google, submits a YouTube URL, and the backend downloads **only the audio**, converts it to a podcast-friendly format, uploads it to a Google Drive folder, and discards the temporary file. No URLs or history are persisted.
+A Spring Boot (Java) web service for a private LAN. Any client device submits a YouTube URL (web page or REST API, no login). The backend downloads **only the audio**, converts it to a small speech-oriented file, uploads it to a Google Drive folder using credentials configured once by the Owner, and discards the temporary file. No URLs or history are persisted.
 
 ```
-Browser / script ──► Spring Boot ──► yt-dlp + ffmpeg (local process) ──► temp audio file
-        ▲  Google login     │                                                  │
-        └──── job status ◄──┘                              Google Drive API ◄───┘ (upload, then delete temp)
+Phone / tablet / PC (no login, no install)
+        │  HTTP on LAN (page, API, share-sheet shortcut)
+        ▼
+  Spring Boot ──► yt-dlp + ffmpeg (local process) ──► temp audio file
+        │                                                   │
+        └── Google Drive API (refresh token from env) ◄─────┘ upload, then delete temp
 ```
 
 ## 2. Research: extracting audio from YouTube
 
 | Option | Type | Pros | Cons |
 |---|---|---|---|
-| **yt-dlp** (+ ffmpeg) | CLI tool run as a subprocess | Most actively maintained; fastest to react to YouTube changes (latest release seen: 2026.08.19); can extract audio, convert (`-x --audio-format`), embed metadata and thumbnail; handles PO tokens/signature logic | Not a Java library (needs Python-free standalone binary, ffmpeg, and a JS runtime for full YouTube support); subprocess management |
-| **NewPipeExtractor** (Java, JitPack) | Pure Java library | Native Java API, no external binary for resolving stream URLs | **GPL-3.0** (affects distribution of the project); only returns stream URLs, so downloading, transcoding and tagging are still our job; YouTube breakages are fixed by library releases, typically slower than yt-dlp |
-| Java wrappers around yt-dlp (e.g. `ytdlp-java`-style libs) | Thin Java wrapper over the CLI | Less boilerplate | Small, lightly maintained projects; add a dependency for what `ProcessBuilder` does in ~50 lines |
-| Other small Java YouTube extractors (e.g. cipher-parsing GitHub projects) | Pure Java | — | Typically abandoned, break often; not recommended |
-| Official YouTube Data API | API | Stable | Does **not** provide media downloads; unusable for this goal |
+| **yt-dlp** (+ ffmpeg) | CLI tool run as a subprocess | Most actively maintained; fastest to react to YouTube changes (latest release seen: 2026.08.19); extracts audio, converts, embeds metadata/thumbnail | Not a Java library (needs the standalone binary, ffmpeg, and a JS runtime for full YouTube support); subprocess management |
+| **NewPipeExtractor** (Java, JitPack) | Pure Java library | Native Java API | **GPL-3.0**; only returns stream URLs, so download, transcoding and tagging are still our job; fixes for YouTube breakages usually slower than yt-dlp |
+| Java wrappers around yt-dlp | Thin Java wrapper over the CLI | Less boilerplate | Small, lightly maintained; `ProcessBuilder` does the same in ~50 lines |
+| Other small Java YouTube extractors | Pure Java | — | Typically abandoned, break often; not recommended |
+| Official YouTube Data API | API | Stable | Does **not** provide media downloads; unusable here |
 
-**Recommendation:** use **yt-dlp invoked via `ProcessBuilder`**, with **ffmpeg** for conversion. Wrap it behind an interface (`AudioExtractor`) so a NewPipeExtractor implementation could be swapped in later if desired.
+**Recommendation:** **yt-dlp via `ProcessBuilder`** + **ffmpeg**, behind an `AudioExtractor` interface so another implementation (e.g. NewPipeExtractor) can be swapped in.
 
-Notes on yt-dlp requirements (verify against the current yt-dlp README at implementation time):
-- Since late 2025 yt-dlp needs an external **JavaScript runtime** (Deno recommended, ≥ 2.0) for full YouTube support. The official standalone executables bundle the solver component (`yt-dlp-ejs`); the runtime itself must still be available.
-- YouTube may require **PO tokens** or cookies for some videos/IPs; datacenter (cloud) IPs are more likely to be blocked than home connections. This is the main risk for US-17 (cloud) and is why the home server is the first target.
-- Keep yt-dlp updatable (`yt-dlp -U` or image rebuild) — US-13.
+Notes (verify against the current yt-dlp README at implementation time):
+- Since late 2025 yt-dlp needs an external **JavaScript runtime** (Deno recommended, ≥ 2.0) for full YouTube support. The official standalone executables bundle the solver component (`yt-dlp-ejs`); the runtime must still be available.
+- YouTube may require **PO tokens** or cookies for some videos/IPs; datacenter IPs are more likely to be blocked than home connections, which favors the LAN/home deployment.
+- yt-dlp must be easy to update (`yt-dlp -U` or image rebuild) — US-13.
 
-Legal: downloading from YouTube may violate its Terms of Service; keep the service private and for personal use.
+Legal: downloading from YouTube may violate its Terms of Service; keep the service private and personal.
 
-## 3. Research: Google authentication and Drive
+## 3. Google Drive access (no user login)
 
-- **Login:** Spring Security **OAuth2 Client** with the `google` provider (OpenID Connect, scopes `openid email profile`).
-- **Authorization of the account:** property `yt2pod.auth.allowed-emails` (comma-separated, via env var `YT2POD_AUTH_ALLOWED_EMAILS`). A custom `OidcUser` check rejects any other account and requires `email_verified=true`. This satisfies "account configurable, not fixed".
-- **Drive access:** request the extra scope `https://www.googleapis.com/auth/drive.file` (least privilege: the app only sees files it created). Because the app creates the target folder itself, `drive.file` is sufficient.
-- **Client library:** `com.google.apis:google-api-services-drive` (v3; latest seen `v3-rev20260913-2.0.0`) with `google-api-client` and `google-auth-library-oauth2-http` (`AccessToken`/`GoogleCredentials` built from the user's Spring-managed access token).
-- **Upload:** `Drive.Files.create` with `InputStreamContent` and **resumable upload** enabled for large files.
-- **Token lifetime:** the Google access token lasts ~1 hour, which covers a normal job if it runs inside the signed-in session. If background/offline use is wanted later (e.g. an API token for iOS Shortcuts), request `access_type=offline` and persist the refresh token (encrypted file or small store). This is the only data persisted; MVP can skip it.
-- **Google Cloud setup (one-off):** create a project, enable the Drive API, configure the OAuth consent screen (External, *Testing* mode with the Owner as a test user is enough for personal use; note refresh tokens in Testing mode expire after 7 days), create an OAuth client ID (Web) with redirect URI `{baseUrl}/login/oauth2/code/google`.
+Clients are anonymous; only the **service** authenticates to Google, as the Owner's account.
+
+- **Mechanism:** OAuth 2.0 "web application" client + a long-lived **refresh token** obtained once. The service builds `UserCredentials` (client ID, client secret, refresh token) from environment variables; the Google client library **requests and renews access tokens automatically** (~1 h lifetime). The service code does not implement renewal itself.
+- **Scope:** `https://www.googleapis.com/auth/drive.file` (least privilege: only files created by the app). The service creates its own target folder, so this scope is enough.
+- **Client libraries:** `com.google.apis:google-api-services-drive` (v3; latest seen `v3-rev20260913-2.0.0`), `google-api-client`, `google-auth-library-oauth2-http`.
+- **Upload:** `Drive.Files.create` with `InputStreamContent`, resumable upload.
+- **Obtaining the refresh token (one-off, US-01):**
+  1. In Google Cloud: create a project, enable the Drive API, configure the OAuth consent screen, create an OAuth client ID (Web) with redirect URI `http://localhost:8080/setup/google/callback`.
+  2. Start the service **on the host** with `YT2POD_SETUP_ENABLED=true`, port bound to localhost only (e.g. `-p 127.0.0.1:8080:8080`).
+  3. Open `http://localhost:8080/setup/google` in the host's browser, sign in with the Drive account, approve. The app requests `access_type=offline` and `prompt=consent` so Google returns a refresh token.
+  4. The callback page shows the refresh token **once**; copy it into the `GOOGLE_REFRESH_TOKEN` environment variable and restart without setup mode.
+  - Google accepts plain `http` redirect URIs only for `localhost`, which is why setup is done on the host. Normal use afterwards involves no redirect at all.
+  - Setup endpoints exist only while `YT2POD_SETUP_ENABLED=true`. A loopback-address check is not used because, with Docker, requests arrive from the bridge gateway rather than `127.0.0.1`; binding the published port to `127.0.0.1` is what protects the setup page.
+- **Token lifetime caveat:** while the Google OAuth app is in *Testing* publishing status, refresh tokens expire after 7 days. Switch the app to *In production* (for a personal app using only `drive.file` this should not require Google's verification — to be confirmed during setup; an "unverified app" warning screen is expected and acceptable for the Owner).
+- **Revocation/expiry:** if Google returns `invalid_grant`, jobs fail with "Drive authorization expired — redo setup" and the health endpoint reports the Drive indicator `DOWN`.
 
 ## 4. Technology stack
 
 | Concern | Choice |
 |---|---|
 | Language / runtime | Java 21 (LTS) |
-| Framework | Spring Boot 3.x (latest stable 3.x at project start), Maven |
-| Web | Spring MVC + a single static HTML page (vanilla JS) or Thymeleaf |
-| Security | spring-boot-starter-oauth2-client, spring-boot-starter-security |
-| Async jobs | `@Async` / `ThreadPoolTaskExecutor` (bounded, configurable concurrency); in-memory job registry (`ConcurrentHashMap`) with TTL eviction |
+| Framework | Spring Boot 3.x (latest stable at project start), Maven |
+| Web | Spring MVC + one static HTML page (vanilla JS) |
+| Security | None for Clients (trusted LAN); Spring Security not required in the MVP |
+| Async jobs | `ThreadPoolTaskExecutor` (bounded, configurable); in-memory job registry (`ConcurrentHashMap`) with TTL eviction |
 | Extraction | yt-dlp + ffmpeg via `ProcessBuilder` |
 | Drive | Google API Client Java libraries (above) |
 | Config | `application.yml` + environment variables |
-| Packaging | Docker image (JRE 21 + ffmpeg + yt-dlp + Deno) |
-| Observability | Spring Boot Actuator (health), SLF4J logging with **no URL/title logging beyond job id at INFO** |
-| Tests | JUnit 5, Mockito, Spring Boot Test, MockMvc; WireMock/fake `AudioExtractor` and `DriveUploader` for integration tests |
+| Packaging | Docker image (JRE 21 + ffmpeg + yt-dlp + Deno), `docker compose` |
+| Observability | Spring Boot Actuator (health), SLF4J logs **without URLs or titles** (job id only) |
+| Tests | JUnit 5, Mockito, Spring Boot Test, MockMvc; fake `AudioExtractor`/`DriveUploader` for integration tests |
 
 ## 5. Architecture
 
 Packages (`com.pablo.yt2pod`):
-- `web` — `ConvertController`, `JobController`, error handling
-- `security` — `SecurityConfig`, allowlist `OidcUserService`
-- `job` — `ConversionJob`, `JobService`, `JobRegistry` (in-memory, TTL)
+- `web` — `ConversionController`, error handling, static page
+- `setup` — one-off Google authorization (`SetupController`, enabled by flag)
+- `job` — `ConversionJob`, `JobService`, `JobRegistry` (in-memory, TTL), rate limiter
 - `extract` — `AudioExtractor` (interface), `YtDlpAudioExtractor`, `YoutubeUrlValidator`
 - `storage` — `DriveUploader` (interface), `GoogleDriveUploader`, folder resolution
 - `config` — `@ConfigurationProperties` classes
 
 Flow:
-1. `POST /api/conversions {url}` → validate URL → create job (`QUEUED`) → return `202` with `{jobId}`.
-2. Async worker: `RUNNING_EXTRACT` → run yt-dlp into a per-job temp dir → `RUNNING_UPLOAD` → upload to Drive folder → `DONE` (stores Drive file name + webViewLink) or `FAILED` (reason).
-3. `finally`: delete temp dir. The URL is not stored on the job object after extraction starts.
-4. `GET /api/conversions/{jobId}` → status. Jobs are owned by the user's email and evicted after a TTL (default 1 h).
+1. `POST /api/conversions {url}` → validate → create job (`QUEUED`) → `202 {jobId}`.
+2. Async worker: `EXTRACTING` → yt-dlp into a per-job temp dir → `UPLOADING` → Drive upload → `DONE` (file name + `webViewLink`) or `FAILED` (reason).
+3. `finally`: delete the temp dir. The URL is dropped from the job object once extraction has started.
+4. `GET /api/conversions/{jobId}` → status. Jobs are evicted after a TTL (default 1 h).
 
 ## 6. API
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | Web page: URL input + status list |
-| POST | `/api/conversions` | Body `{ "url": "..." }` → `202 {jobId}`; `400` invalid URL; `401/403` auth |
+| GET | `/` | Web page: URL input + status of the jobs submitted from that browser |
+| POST | `/api/conversions` | Body `{ "url": "..." }` → `202 {jobId}`; `400` invalid URL; `429` too many jobs |
 | GET | `/api/conversions/{jobId}` | `{status, fileName?, driveLink?, error?}` |
-| GET | `/actuator/health` | Health |
+| GET | `/actuator/health` | Health (includes Drive credential check) |
+| GET | `/setup/google`, `/setup/google/callback` | One-off authorization; only when `YT2POD_SETUP_ENABLED=true` |
 
 Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`.
+
+### Phone "Share" menu (US-06)
+
+The share sheet can only target **apps**. The plain-HTTP LAN page cannot appear there: browsers only let installed web apps (PWAs) receive shares, installing a PWA needs HTTPS, and iOS Safari does not support receiving shares at all. The solution is a small shortcut on the phone that calls the API over plain HTTP:
+- **iOS:** Apple *Shortcuts* app → new shortcut with "Show in Share Sheet" enabled (accepts URLs) → action "Get Contents of URL": `POST http://<host>:8080/api/conversions`, JSON body `{"url": <Shortcut Input>}` → show the result as a notification. Created once; then it appears in the Share menu of YouTube/Safari.
+- **Android:** *HTTP Shortcuts* (or Tasker) app: define a request with the same URL/JSON body, using the shared text as the `url` variable; it appears in the Share menu.
+- To make this easy, the endpoint also accepts a form-encoded or plain-text body, and the shared text may contain extra words around the URL (the first YouTube URL found is used).
+- The project will ship step-by-step instructions and example requests. The exact steps and plain-HTTP behavior of these apps are to be verified on real devices at implementation time. A later HTTPS phase could add a PWA with Web Share Target on Android.
 
 ## 7. yt-dlp invocation
 
@@ -92,65 +112,56 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
        --embed-metadata --embed-thumbnail --restrict-filenames \
        --max-filesize <cfg> -o "<tmpdir>/%(title).150B.%(ext)s" -- <url>
 ```
-- Arguments passed as a list (no shell) and the URL after `--` to prevent option/command injection; the URL must pass `YoutubeUrlValidator` first (host allowlist: `youtube.com`, `www.`, `m.`, `youtu.be`, `music.youtube.com`).
-- **Quality: speech-oriented, not best.** Default is **64 kbps mono** AAC/M4A (≈ 29 MB per hour; 192 kbps would be ≈ 86 MB/hour). 192 kbps is more than speech needs, and YouTube's own AAC audio is typically ~128 kbps, so 192 would only inflate the file without adding quality. Configurable via `yt2pod.audio.bitrate` (e.g. `96K` for stereo/music-like content) and `yt2pod.audio.mono`. Because the target is lower than the source, ffmpeg always re-encodes (small CPU cost).
-- `m4a` default (AAC); `mp3` selectable via `yt2pod.audio.format`.
-- Timeout and output capture (stderr parsed to map errors: unavailable, private, age-restricted, geo-blocked → user-friendly messages).
-- Title/metadata is read from yt-dlp's output file name; Drive file name collisions are resolved by suffixing.
+- Arguments are passed as a list (no shell) with the URL after `--`; the URL must first pass `YoutubeUrlValidator` (host allowlist: `youtube.com`, `www.`, `m.`, `youtu.be`, `music.youtube.com`).
+- **Quality: speech-oriented, not best.** Default **64 kbps mono** M4A/AAC (≈ 29 MB per hour; 192 kbps would be ≈ 86 MB/hour). YouTube's own AAC is typically ~128 kbps, so 192 would only inflate the file. Configurable (`yt2pod.audio.bitrate`, `yt2pod.audio.mono`, `yt2pod.audio.format`). The target is lower than the source, so ffmpeg always re-encodes (small CPU cost).
+- Timeout and output capture; stderr is mapped to user-friendly errors (unavailable, private, age-restricted, geo-blocked).
+- Drive file name collisions are resolved by suffixing.
 
-## 8. Configuration (env-driven)
+## 8. Configuration (environment variables)
 
-| Property | Env var | Default |
+| Env var | Property | Default |
 |---|---|---|
-| `spring.security.oauth2.client.registration.google.client-id/secret` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — |
-| `yt2pod.auth.allowed-emails` | `YT2POD_AUTH_ALLOWED_EMAILS` | — (required) |
-| `yt2pod.drive.folder-name` | `YT2POD_DRIVE_FOLDER_NAME` | `yt2pod` |
-| `yt2pod.audio.format` | `YT2POD_AUDIO_FORMAT` | `m4a` |
-| `yt2pod.audio.bitrate` | `YT2POD_AUDIO_BITRATE` | `64K` |
-| `yt2pod.audio.mono` | `YT2POD_AUDIO_MONO` | `true` |
-| `yt2pod.extractor.yt-dlp-path` / `ffmpeg-path` | | `yt-dlp` / `ffmpeg` |
-| `yt2pod.jobs.max-concurrent` | | `2` |
-| `yt2pod.jobs.ttl` | | `1h` |
-| `yt2pod.limits.max-duration` | | `3h` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `yt2pod.google.client-id/secret` | — (required) |
+| `GOOGLE_REFRESH_TOKEN` | `yt2pod.google.refresh-token` | — (required after setup) |
+| `YT2POD_SETUP_ENABLED` | `yt2pod.setup.enabled` | `false` |
+| `YT2POD_DRIVE_FOLDER_NAME` | `yt2pod.drive.folder-name` | `yt2pod` |
+| `YT2POD_AUDIO_FORMAT` | `yt2pod.audio.format` | `m4a` |
+| `YT2POD_AUDIO_BITRATE` | `yt2pod.audio.bitrate` | `64K` |
+| `YT2POD_AUDIO_MONO` | `yt2pod.audio.mono` | `true` |
+| `YT2POD_JOBS_MAX_CONCURRENT` | `yt2pod.jobs.max-concurrent` | `2` |
+| `YT2POD_JOBS_TTL` | `yt2pod.jobs.ttl` | `1h` |
+| `YT2POD_LIMITS_MAX_DURATION` | `yt2pod.limits.max-duration` | `3h` |
+| `YT2POD_YTDLP_PATH`, `YT2POD_FFMPEG_PATH` | `yt2pod.extractor.*` | `yt-dlp`, `ffmpeg` |
 
 ## 9. Deployment
 
-- **Phase 1 — MVP, localhost only:** run on the Owner's computer (`java -jar` or `docker compose`) and use it at `http://localhost:8080`. Google allows plain `http` redirect URIs for `localhost`, so Google login needs no domain, certificate or proxy. Redirect URI: `http://localhost:8080/login/oauth2/code/google`. Only outbound internet access is required (Google, YouTube). Limitation: only usable from the host machine itself. If Docker is used, publish the port as `127.0.0.1:8080:8080`, and the browser must use `localhost` (not the machine's IP or hostname) for login to work.
-- **Phase 2 — LAN access (only if the MVP proves useful):** Google login needs an HTTPS redirect URI with a real domain name; Google only allows plain `http` for `localhost` and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names. Plan: **own domain name + Caddy with a Let's Encrypt certificate**. Client devices need **nothing installed** (Tailscale was considered and discarded: it requires the app on every client, or Funnel, which publishes the service on the internet).
-  - **Domain:** a domain or subdomain you control (e.g. `yt2pod.example.com`). Cost is a few euros/year; a free subdomain service also works.
-  - **DNS:** make `yt2pod.<your-domain>` resolve to the server's **LAN IP** (give it a static/reserved IP in the router). Either a public A record pointing to the private IP, or, preferably, a local DNS override on the router/Pi-hole. Some routers block public names that resolve to private IPs ("DNS rebinding protection"); the local override avoids that.
-  - **Certificate:** Caddy obtains and renews a Let's Encrypt certificate using the **DNS-01 challenge** (needs a Caddy build with the plugin for your DNS provider and an API token). No inbound port is opened and the service is never exposed to the internet.
-  - **Reverse proxy:** Caddy terminates TLS on 443 and forwards to Spring Boot on `localhost:8080`; both run via `docker compose`.
-  - **Google Cloud OAuth client:** redirect URI `https://yt2pod.<your-domain>/login/oauth2/code/google`.
-  - `http://localhost:8080` still works on the host itself for development (Google allows `http` for `localhost`).
-  The service itself stays HTTP internally; Caddy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
-- **Phase 3 — Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
+- **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, port 8080 published to the LAN; clients use `http://<host-ip-or-name>:8080`. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so shortcuts keep working. **Never port-forward this service to the internet** (it has no authentication).
+- **Phase 2 — Cloud (later, optional):** same image behind HTTPS with access control added (not designed here). YouTube may block datacenter IPs, possibly requiring a cookies/PO-token provider — validate early. In-memory jobs imply a single instance.
+- **Possible future HTTPS for LAN:** own domain + Caddy with a Let's Encrypt DNS-01 certificate (would also enable a PWA share target on Android). Not needed for the MVP.
 
 ## 10. Security & privacy
 
-- Only allowlisted, verified Google accounts; all endpoints authenticated; CSRF enabled for the web page.
-- `drive.file` scope only; secrets only via env vars/secret store, never committed.
+- No client authentication by design (trusted LAN); mitigations: concurrency cap, rate limit, strict URL validation, no shell invocation, limits on duration/size.
+- `drive.file` scope only; Google secrets only via environment variables/secret store, never committed or logged. The setup page shows the refresh token once and exists only in setup mode.
 - No URL/history persistence; logs avoid URLs and titles; temp files always deleted.
-- Rate limit per user (simple in-memory) to protect the host.
 
 ## 11. Risks & open questions
 
 1. **YouTube anti-bot changes** (PO tokens, cookies, JS runtime) can break extraction at any time → keep yt-dlp updatable; isolate behind `AudioExtractor`.
-2. **Cloud IP blocking** → validate from a cloud host before committing to the cloud stage.
-3. **Google OAuth app in *Testing* mode** → refresh tokens expire in 7 days; acceptable for the MVP since login is interactive.
-4. **Background/API access without browser session** (e.g. iOS Shortcut) → needs a persisted refresh token or a personal API token; decide after MVP.
-5. **ToS/legal** → personal use only.
-6. Output format preference (and bitrate: 64K mono assumed enough for speech): M4A vs MP3 (confirm podcatcher import behavior).
+2. **Unauthenticated service on the LAN:** anyone on the network can use it and fill the Drive folder; accepted for the MVP, revisit if the network is shared/untrusted.
+3. **Refresh-token lifetime:** requires the OAuth app in *In production* status to avoid 7-day expiry; verify during setup.
+4. **Share-sheet shortcuts:** depend on third-party apps on Android and on the Shortcuts app on iOS; verify on real devices.
+5. **Cloud IP blocking** by YouTube.
+6. **ToS/legal:** personal use only.
 
 ## 12. Suggested milestones
 
-1. Skeleton: Spring Boot project, Google login on `localhost` + allowlist, health.
-2. `YtDlpAudioExtractor` + URL validation (CLI-level tests).
-3. `GoogleDriveUploader` + folder handling.
+1. Skeleton: Spring Boot project, config properties, health endpoint, Dockerfile skeleton.
+2. `YtDlpAudioExtractor` + URL validation (tests with a fake process and a manual real run).
+3. One-off Google setup flow + `GoogleDriveUploader` + folder handling.
 4. Async job flow + REST API + simple web page.
-5. MVP packaging: runnable JAR / Dockerfile, README (localhost).
-6. Phase 2: LAN access with domain + Caddy (if useful).
-7. Phase 3: cloud trial and hardening.
+5. `docker compose` packaging, README, share-sheet shortcut instructions (iOS/Android).
+6. Optional: HTTPS for LAN, cloud trial.
 
 ## Sources
 
