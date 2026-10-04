@@ -11,6 +11,7 @@ import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.DriveScopes;
 import com.pablo.yt2pod.config.Yt2podProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ public class DefaultGoogleOAuthClient implements GoogleOAuthClient {
 
 	private final HttpTransport transport;
 
+	@Autowired
 	public DefaultGoogleOAuthClient(Yt2podProperties properties) throws GeneralSecurityException, IOException {
 		this(properties, GoogleNetHttpTransport.newTrustedTransport());
 	}

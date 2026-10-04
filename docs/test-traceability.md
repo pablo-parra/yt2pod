@@ -6,7 +6,7 @@ Every test is named with the user story it verifies (`USxx_...` method names and
 
 | Story | Status | Tests |
 |---|---|---|
-| US-01 Connect Drive | covered | `SetupControllerTest.US01_*`, `DefaultGoogleOAuthClientTest.US01_*`, `GoogleDriveUploaderTest.US01_*`, `DriveHealthIndicatorTest.US01_*`, `Yt2podApplicationTests.US01_*` |
+| US-01 Connect Drive | covered | `SetupModeApplicationTests.US01_*`, `SetupControllerTest.US01_*`, `DefaultGoogleOAuthClientTest.US01_*`, `GoogleDriveUploaderTest.US01_*`, `DriveHealthIndicatorTest.US01_*`, `Yt2podApplicationTests.US01_*` |
 | US-02 Configurable Drive account | covered | `GoogleDriveGatewayTest.US02_*`, `DefaultGoogleOAuthClientTest.US01_US02_*` |
 | US-03 Automatic token renewal | covered (against a fake Google) | `GoogleDriveGatewayTest.US03_*`, `GoogleDriveUploaderTest.US03_*`, `DriveHealthIndicatorTest.US03_*` |
 | US-04 Web page | covered (page contents; browser behaviour checked manually) | `Yt2podApplicationTests.US04_*` |
