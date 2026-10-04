@@ -6,6 +6,8 @@
 - **Owner:** installs and configures the service, and connects it to a Google Drive account (one-off).
 - **Client:** any device on the LAN (phone, tablet, computer) that sends a link. Clients need **no login and no installed software**.
 
+Implementation status: all Must and Should stories are implemented; US-13 (playlist/batch) and US-16 (cloud) are not. See [test-traceability.md](test-traceability.md).
+
 Priority: **M** = Must (MVP), **S** = Should, **C** = Could.
 
 ---

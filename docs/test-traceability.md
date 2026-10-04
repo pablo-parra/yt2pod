@@ -20,7 +20,9 @@ Every test is named with the user story it verifies (`USxx_...` method names and
 | US-12 Resilience to YouTube changes | covered | `YtDlpCommandBuilderTest.US12_*`, `YtDlpAudioExtractorTest.US12_*`, `DefaultProcessRunnerTest.US12_*` |
 | US-13 Playlists (could) | rejection covered | `YoutubeUrlValidatorTest.US13_*`, `YtDlpCommandBuilderTest.US13_*`; batch support not planned yet |
 | US-14 Duration limit (could) | covered | `YtDlpCommandBuilderTest.US14_*`, `YtDlpAudioExtractorTest.US14_*`, `JobServiceTest.US14_*` |
-| US-15 Self-host / env configuration | covered (config and concurrency); Docker image not yet built | `Yt2podApplicationTests.US15_*` |
+| US-15 Self-host / env configuration | covered (config and concurrency); Docker image built and run manually | `Yt2podApplicationTests.US15_*` |
 | US-16 Cloud (could) | n/a | — |
+
+Verified manually (not automated): Docker image, real Google OAuth and Drive upload, real yt-dlp conversion, use from a phone over the LAN.
 
 Not covered by automated tests: real calls to Google (the Drive/OAuth tests use a fake HTTP transport) and a real yt-dlp run against YouTube (needs network, yt-dlp, ffmpeg and Deno installed; to be done manually or as an opt-in test).

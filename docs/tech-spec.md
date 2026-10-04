@@ -1,6 +1,6 @@
 # yt2pod — Technical Specification
 
-Status: draft v0.2 · Covers user stories in [user-stories.md](user-stories.md)
+Status: v1.0, MVP implemented and verified end to end · Covers user stories in [user-stories.md](user-stories.md)
 
 ## 1. Summary
 
@@ -40,12 +40,12 @@ Clients are anonymous; only the **service** authenticates to Google, as the Owne
 
 - **Mechanism:** OAuth 2.0 "web application" client + a long-lived **refresh token** obtained once. The service builds `UserCredentials` (client ID, client secret, refresh token) from environment variables; the Google client library **requests and renews access tokens automatically** (~1 h lifetime). The service code does not implement renewal itself.
 - **Scope:** `https://www.googleapis.com/auth/drive.file` (least privilege: only files created by the app). The service creates its own target folder, so this scope is enough.
-- **Client libraries:** `com.google.apis:google-api-services-drive` (v3; latest seen `v3-rev20260913-2.0.0`), `google-api-client`, `google-auth-library-oauth2-http`.
+- **Client libraries:** `com.google.apis:google-api-services-drive` `v3-rev20260916-2.0.0`, with `google-api-client` 2.9.1 and `google-auth-library-oauth2-http` 1.54.0.
 - **Upload:** `Drive.Files.create` with `InputStreamContent`, resumable upload.
 - **Obtaining the refresh token (one-off, US-01):**
-  1. In Google Cloud: create a project, enable the Drive API, configure the OAuth consent screen, create an OAuth client ID (Web) with redirect URI `http://localhost:8080/setup/google/callback`.
-  2. Start the service **on the host** with `YT2POD_SETUP_ENABLED=true`, port bound to localhost only (e.g. `-p 127.0.0.1:8080:8080`).
-  3. Open `http://localhost:8080/setup/google` in the host's browser, sign in with the Drive account, approve. The app requests `access_type=offline` and `prompt=consent` so Google returns a refresh token.
+  1. In Google Cloud (free, no billing needed): create a project, enable the **Google Drive API**, configure **Google Auth Platform** (audience *External*, your account as test user; "Interno" is only available for Google Workspace organizations), and create an OAuth client of type *Web application* with redirect URI `http://localhost:8080/setup/google/callback`. Put the client ID/secret in `.env`.
+  2. Start the service in setup mode on the machine whose browser you will use: `set -a && source .env && set +a && YT2POD_SETUP_ENABLED=true ./mvnw spring-boot:run` (as done in practice), or a container with the port bound to localhost only (`-p 127.0.0.1:8080:8080`).
+  3. Open `http://localhost:8080/setup/google` in the host's browser, sign in with the Drive account, approve (an "unverified app" warning appears: **Advanced → Go to yt2pod**). The app requests `access_type=offline` and `prompt=consent` so Google returns a refresh token.
   4. The callback page shows the refresh token **once**; copy it into the `GOOGLE_REFRESH_TOKEN` environment variable and restart without setup mode.
   - Google accepts plain `http` redirect URIs only for `localhost`, which is why setup is done on the host. Normal use afterwards involves no redirect at all.
   - Setup endpoints exist only while `YT2POD_SETUP_ENABLED=true`. A loopback-address check is not used because, with Docker, requests arrive from the bridge gateway rather than `127.0.0.1`; binding the published port to `127.0.0.1` is what protects the setup page.
@@ -82,13 +82,13 @@ Flow:
 1. `POST /api/conversions {url}` → validate → create job (`QUEUED`) → `202 {jobId}`.
 2. Async worker: `EXTRACTING` → yt-dlp into a per-job temp dir → `UPLOADING` → Drive upload → `DONE` (file name + `webViewLink`) or `FAILED` (reason).
 3. `finally`: delete the temp dir. The URL is dropped from the job object once extraction has started.
-4. `GET /api/conversions/{jobId}` → status. Jobs are evicted after a TTL (default 1 h).
+4. `GET /api/conversions/{jobId}` → status. Finished jobs are evicted after a TTL (default 1 h). Admission control: at most `max-concurrent` jobs run at once and new submissions get `429` once unfinished jobs reach 5 × `max-concurrent`.
 
 ## 6. API
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | Web page: URL input + status of the jobs submitted from that browser |
+| GET | `/` | Web page (static `index.html`): URL input + live status of the jobs submitted from that page |
 | POST | `/api/conversions` | Body `{ "url": "..." }` → `202 {jobId}`; `400` invalid URL; `429` too many jobs |
 | GET | `/api/conversions/{jobId}` | `{status, fileName?, driveLink?, error?}` |
 | GET | `/actuator/health` | Health (includes Drive credential check) |
@@ -101,16 +101,17 @@ Phone/tablet clients use the web page manually (copy the link, open `http://<hos
 ## 7. yt-dlp invocation
 
 ```
-yt-dlp --ffmpeg-location <ffmpeg> --no-playlist -f "bestaudio/best" -x \
+yt-dlp --no-playlist -f "bestaudio/best" -x \
        --audio-format m4a --audio-quality 64K --postprocessor-args "ffmpeg:-ac 1" \
        --embed-metadata --embed-thumbnail \
        --match-filters "!is_live & duration<=<max-seconds>" --no-progress \
        -o "<tmpdir>/%(title).150B.%(ext)s" -- <canonical-url>
 ```
 - Arguments are passed as a list (no shell) with the URL after `--`; the URL must first pass `YoutubeUrlValidator`, which accepts only single-video links on `youtube.com`, `www.`, `m.`, `music.youtube.com` and `youtu.be`, and **rewrites them to `https://www.youtube.com/watch?v=<id>`** so no other part of the input reaches yt-dlp.
+- `--ffmpeg-location` is added only when the configured ffmpeg path contains a `/`; yt-dlp reads that option as a path, so a bare `ffmpeg` must be found through `PATH` (passing it made the first real run fail).
 - Videos rejected by `--match-filters` (live or too long) make yt-dlp exit 0 without a file; the extractor detects this and reports `LIMIT_EXCEEDED`. After a successful run only the audio file is kept (thumbnails and intermediates are deleted).
 - **Quality: speech-oriented, not best.** Default **64 kbps mono** M4A/AAC (≈ 29 MB per hour; 192 kbps would be ≈ 86 MB/hour). YouTube's own AAC is typically ~128 kbps, so 192 would only inflate the file. Configurable (`yt2pod.audio.bitrate`, `yt2pod.audio.mono`, `yt2pod.audio.format`). The target is lower than the source, so ffmpeg always re-encodes (small CPU cost).
-- Timeout and output capture; yt-dlp output is mapped to user-friendly failures (`ExtractionFailure`: unavailable, private, age-restricted, geo-blocked, bot check, limit exceeded, timeout, tool not found, unknown).
+- Timeout and output capture (yt-dlp output is logged only at DEBUG because it can contain titles); yt-dlp output is mapped to user-friendly failures (`ExtractionFailure`: unavailable, private, age-restricted, geo-blocked, bot check, limit exceeded, timeout, tool not found, unknown).
 - Drive file name collisions are resolved by suffixing.
 
 ## 8. Configuration (environment variables)
@@ -150,14 +151,15 @@ yt-dlp --ffmpeg-location <ffmpeg> --no-playlist -f "bestaudio/best" -x \
 4. **Cloud IP blocking** by YouTube.
 6. **ToS/legal:** personal use only.
 
-## 12. Suggested milestones
+## 12. Implementation status
 
-1. Skeleton: Spring Boot project, config properties, health endpoint, Dockerfile skeleton.
-2. `YtDlpAudioExtractor` + URL validation (tests with a fake process and a manual real run).
-3. One-off Google setup flow + `GoogleDriveUploader` + folder handling.
-4. Async job flow + REST API + simple web page.
-5. `docker compose` packaging, README.
-6. Optional: HTTPS for LAN, cloud trial.
+Milestones 1–5 are done: skeleton and configuration, yt-dlp extractor and URL validation, Google setup and Drive upload, async jobs with REST API and web page, Docker packaging. Verified manually on macOS (Docker, arm64): setup flow, conversion from the desktop and from a phone over the LAN (20-minute video). Tests per user story: see [test-traceability.md](test-traceability.md).
+
+Not implemented: playlist/batch conversion (US-13), cloud deployment (US-16), HTTPS for the LAN.
+
+Lessons from the first real run:
+- yt-dlp treats `--ffmpeg-location` as a path (see §7).
+- Google shows an "unverified app" warning and blocks accounts not listed as test users while the app is in *Testing* status.
 
 ## Sources
 
