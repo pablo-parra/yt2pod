@@ -115,13 +115,14 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 ## 9. Deployment
 
-- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Decision: **Tailscale** provides the HTTPS name.
-  - One-off setup: install Tailscale on the host and on each client device (phone, laptop); in the Tailscale admin console enable **MagicDNS** and **HTTPS certificates**.
-  - On the host: `tailscale serve --bg --https=443 http://localhost:8080` exposes the app at `https://<machine>.<tailnet>.ts.net` (certificate issued and renewed by Tailscale). Do **not** use Funnel; the service stays private to the tailnet.
-  - Google Cloud OAuth client: add redirect URI `https://<machine>.<tailnet>.ts.net/login/oauth2/code/google`. (To verify during setup: that Google accepts the `ts.net` domain as a redirect host; if not, fall back to an own domain + Caddy with a DNS-01 Let's Encrypt certificate.)
-  - Clients must be running Tailscale to reach the service, also when at home; traffic between devices on the same LAN is direct.
-  - `http://localhost:8080` still works on the host itself for development.
-  The service itself stays HTTP internally; the proxy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
+- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Decision: **own domain name + Caddy with a Let's Encrypt certificate**. Client devices need **nothing installed**: any browser on the LAN opens `https://yt2pod.<your-domain>` directly. (Tailscale was considered and discarded: it requires the app on every client device, or Funnel, which publishes the service on the internet.)
+  - **Domain:** a domain or subdomain you control (e.g. `yt2pod.example.com`). Cost is a few euros/year; a free subdomain service also works.
+  - **DNS:** make `yt2pod.<your-domain>` resolve to the server's **LAN IP** (give it a static/reserved IP in the router). Either a public A record pointing to the private IP, or, preferably, a local DNS override on the router/Pi-hole. Some routers block public names that resolve to private IPs ("DNS rebinding protection"); the local override avoids that.
+  - **Certificate:** Caddy obtains and renews a Let's Encrypt certificate using the **DNS-01 challenge** (needs a Caddy build with the plugin for your DNS provider and an API token). No inbound port is opened and the service is never exposed to the internet.
+  - **Reverse proxy:** Caddy terminates TLS on 443 and forwards to Spring Boot on `localhost:8080`; both run via `docker compose`.
+  - **Google Cloud OAuth client:** redirect URI `https://yt2pod.<your-domain>/login/oauth2/code/google`.
+  - `http://localhost:8080` still works on the host itself for development (Google allows `http` for `localhost`).
+  The service itself stays HTTP internally; Caddy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
 - **Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
 
 ## 10. Security & privacy
