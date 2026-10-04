@@ -87,12 +87,14 @@ Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`.
 ## 7. yt-dlp invocation
 
 ```
-yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 0 \
+yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 64K \
+       --postprocessor-args "ffmpeg:-ac 1" \
        --embed-metadata --embed-thumbnail --restrict-filenames \
        --max-filesize <cfg> -o "<tmpdir>/%(title).150B.%(ext)s" -- <url>
 ```
 - Arguments passed as a list (no shell) and the URL after `--` to prevent option/command injection; the URL must pass `YoutubeUrlValidator` first (host allowlist: `youtube.com`, `www.`, `m.`, `youtu.be`, `music.youtube.com`).
-- `m4a` default (AAC, small, usually no re-encode when YouTube already provides AAC); `mp3` selectable via `yt2pod.audio.format`.
+- **Quality: speech-oriented, not best.** Default is **64 kbps mono** AAC/M4A (≈ 29 MB per hour; 192 kbps would be ≈ 86 MB/hour). 192 kbps is more than speech needs, and YouTube's own AAC audio is typically ~128 kbps, so 192 would only inflate the file without adding quality. Configurable via `yt2pod.audio.bitrate` (e.g. `96K` for stereo/music-like content) and `yt2pod.audio.mono`. Because the target is lower than the source, ffmpeg always re-encodes (small CPU cost).
+- `m4a` default (AAC); `mp3` selectable via `yt2pod.audio.format`.
 - Timeout and output capture (stderr parsed to map errors: unavailable, private, age-restricted, geo-blocked → user-friendly messages).
 - Title/metadata is read from yt-dlp's output file name; Drive file name collisions are resolved by suffixing.
 
@@ -104,6 +106,8 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 0
 | `yt2pod.auth.allowed-emails` | `YT2POD_AUTH_ALLOWED_EMAILS` | — (required) |
 | `yt2pod.drive.folder-name` | `YT2POD_DRIVE_FOLDER_NAME` | `yt2pod` |
 | `yt2pod.audio.format` | `YT2POD_AUDIO_FORMAT` | `m4a` |
+| `yt2pod.audio.bitrate` | `YT2POD_AUDIO_BITRATE` | `64K` |
+| `yt2pod.audio.mono` | `YT2POD_AUDIO_MONO` | `true` |
 | `yt2pod.extractor.yt-dlp-path` / `ffmpeg-path` | | `yt-dlp` / `ffmpeg` |
 | `yt2pod.jobs.max-concurrent` | | `2` |
 | `yt2pod.jobs.ttl` | | `1h` |
@@ -111,7 +115,11 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 0
 
 ## 9. Deployment
 
-- **Home server (first target):** `docker run` / `docker compose` with env vars; reach it on the LAN or via a tunnel/reverse proxy with HTTPS (Google OAuth requires HTTPS redirect URIs except for `localhost`).
+- **Self-hosted on a private computer, LAN access (first target):** fully compatible with the requirements; nothing needs a public server. Run with `docker compose` (or plain JAR) on the always-on machine and open it from phones/laptops on the LAN. One constraint to plan for: **Google login needs an HTTPS redirect URI with a real domain name**; Google only allows plain `http` for `localhost`, and (to my knowledge) rejects raw private IPs such as `192.168.x.x` and `.local` names for web OAuth clients. Options, simplest first:
+  1. **Tailscale** (free for personal use): the machine gets an HTTPS name via `tailscale cert`/`serve`; reachable from the LAN and from outside, no port opening.
+  2. **Own domain** (a cheap one, or a subdomain) whose DNS A record points to the LAN IP (or local DNS override), with a Let's Encrypt certificate obtained through the DNS-01 challenge (no inbound exposure), served by a reverse proxy (Caddy/Traefik) in front of Spring Boot.
+  3. **Fallback for the machine itself only:** `http://localhost:8080` works without HTTPS.
+  The service itself stays HTTP internally; the proxy terminates TLS (`server.forward-headers-strategy=framework`). Only outbound internet access is required (Google, YouTube).
 - **Cloud (later):** same image on any container host (VPS, Cloud Run, Fly.io, etc.), behind HTTPS (`server.forward-headers-strategy=framework`). Caveats: temp disk is ephemeral (fine, files are transient); in-memory jobs require a single instance (or sticky sessions); **YouTube may block datacenter IPs**, possibly requiring cookies/PO-token provider — to be validated early.
 
 ## 10. Security & privacy
@@ -128,7 +136,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 0
 3. **Google OAuth app in *Testing* mode** → refresh tokens expire in 7 days; acceptable for the MVP since login is interactive.
 4. **Background/API access without browser session** (e.g. iOS Shortcut) → needs a persisted refresh token or a personal API token; decide after MVP.
 5. **ToS/legal** → personal use only.
-6. Output format preference: M4A vs MP3 (confirm Pocket Casts import behavior).
+6. Output format preference (and bitrate: 64K mono assumed enough for speech): M4A vs MP3 (confirm podcatcher import behavior).
 
 ## 12. Suggested milestones
 

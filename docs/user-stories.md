@@ -1,6 +1,6 @@
 # yt2pod — User Stories
 
-**Goal:** send a YouTube link to a web service, which extracts only the audio and saves it as an audio file in a Google Drive folder. The user then manually imports the file into their podcatcher (Pocket Casts). The import step is out of scope.
+**Goal:** send a YouTube link to a web service, which extracts only the audio and saves it as an audio file in a Google Drive folder. The user then manually imports the file into their podcatcher app. The import step is out of scope.
 
 **Actor:** the *Owner* — a single person using the service for personal purposes, identified through a configurable Google account.
 
@@ -55,12 +55,12 @@ As the Owner, I want only the audio track extracted, so that files are small and
 - No video data is retained after the job finishes.
 
 ### US-09 Podcast-friendly audio format (M)
-As the Owner, I want the audio saved in a format Pocket Casts plays reliably (e.g. M4A/AAC or MP3).
+As the Owner, I want the audio saved in a format podcatcher apps play reliably (e.g. M4A/AAC or MP3).
 - Default format is configurable.
-- Best available audio quality is used by default.
+- Speech-oriented quality by default: 64 kbps mono (configurable, e.g. up to 128 kbps), prioritizing small files over fidelity.
 
 ### US-10 Save to a Google Drive folder (M)
-As the Owner, I want the audio file saved into a dedicated Google Drive folder so I can find it easily and import it into Pocket Casts.
+As the Owner, I want the audio file saved into a dedicated Google Drive folder so I can find it easily and import it into my podcatcher.
 - Folder name/ID is configurable; created automatically if missing.
 - Filename is derived from the video title (sanitized); name collisions do not overwrite existing files.
 
@@ -89,8 +89,10 @@ As the Owner, I want a configurable maximum duration to avoid accidentally conve
 
 ## Epic 5 — Deployment
 
-### US-16 Run on a local/home server (M)
-As the Owner, I want to run the service on my own machine or home server (e.g. with Docker), configured entirely by environment variables.
+### US-16 Self-host on a private computer, reachable over the LAN (M)
+As the Owner, I want to run the service on my own computer or home server (e.g. with Docker), configured entirely by environment variables, and reach it from other devices on my LAN (phone, laptop).
+- No cloud dependency other than Google (login and Drive) and YouTube.
+- Reachable via a stable hostname over HTTPS (needed for Google login; see tech spec §9).
 
 ### US-17 Move to the cloud later (S)
 As the Owner, I want the same artifact to be deployable on a cloud host without code changes, so I can reach it from anywhere over HTTPS.
@@ -107,6 +109,6 @@ As the Owner, I want the same artifact to be deployable on a cloud host without 
 
 ## Out of scope
 
-- Importing the file into Pocket Casts (done manually by the Owner).
+- Importing the file into the podcatcher app (done manually by the Owner).
 - Generating a podcast RSS feed.
 - Storing history of conversions or links.
