@@ -30,7 +30,7 @@ Phone / tablet / PC (no login, no install)
 Notes (verify against the current yt-dlp README at implementation time):
 - Since late 2025 yt-dlp needs an external **JavaScript runtime** (Deno recommended, ≥ 2.0) for full YouTube support. The official standalone executables bundle the solver component (`yt-dlp-ejs`); the runtime must still be available.
 - YouTube may require **PO tokens** or cookies for some videos/IPs; datacenter IPs are more likely to be blocked than home connections, which favors the LAN/home deployment.
-- yt-dlp must be easy to update (`yt-dlp -U` or image rebuild) — US-13.
+- yt-dlp must be easy to update (`yt-dlp -U` or image rebuild) — US-12.
 
 Legal: downloading from YouTube may violate its Terms of Service; keep the service private and personal.
 
@@ -131,7 +131,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 
 - **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, port 8080 published to the LAN; clients use `http://<host-ip-or-name>:8080`. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so the address stays stable. **Never port-forward this service to the internet** (it has no authentication).
 - **Phase 2 — Cloud (later, optional):** same image behind HTTPS with access control added (not designed here). YouTube may block datacenter IPs, possibly requiring a cookies/PO-token provider — validate early. In-memory jobs imply a single instance.
-- **Possible future HTTPS for LAN:** own domain + Caddy with a Let's Encrypt DNS-01 certificate (would also enable a PWA share target on Android). Not needed for the MVP.
+- **Possible future HTTPS for LAN:** own domain + Caddy with a Let's Encrypt DNS-01 certificate. Not needed for the MVP.
 
 ## 10. Security & privacy
 
