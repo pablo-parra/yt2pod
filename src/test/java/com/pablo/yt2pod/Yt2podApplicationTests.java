@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Duration;
 
 import com.pablo.yt2pod.config.Yt2podProperties;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,14 +26,16 @@ class Yt2podApplicationTests {
 	private Yt2podProperties properties;
 
 	@Test
-	void healthIsUp() throws Exception {
+	@DisplayName("US-15 the service starts and reports healthy")
+	void US15_healthIsUp() throws Exception {
 		mockMvc.perform(get("/actuator/health"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("UP"));
 	}
 
 	@Test
-	void defaultsAreSpeechOriented() {
+	@DisplayName("US-08/US-15 defaults come from configuration (speech-oriented audio, folder, limits)")
+	void US08_US15_defaultsAreSpeechOriented() {
 		assertThat(properties.audio().format()).isEqualTo("m4a");
 		assertThat(properties.audio().bitrate()).isEqualTo("64K");
 		assertThat(properties.audio().mono()).isTrue();

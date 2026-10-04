@@ -101,14 +101,16 @@ Phone/tablet clients use the web page manually (copy the link, open `http://<hos
 ## 7. yt-dlp invocation
 
 ```
-yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 64K \
-       --postprocessor-args "ffmpeg:-ac 1" \
-       --embed-metadata --embed-thumbnail --restrict-filenames \
-       --max-filesize <cfg> -o "<tmpdir>/%(title).150B.%(ext)s" -- <url>
+yt-dlp --ffmpeg-location <ffmpeg> --no-playlist -f "bestaudio/best" -x \
+       --audio-format m4a --audio-quality 64K --postprocessor-args "ffmpeg:-ac 1" \
+       --embed-metadata --embed-thumbnail \
+       --match-filters "!is_live & duration<=<max-seconds>" --no-progress \
+       -o "<tmpdir>/%(title).150B.%(ext)s" -- <canonical-url>
 ```
-- Arguments are passed as a list (no shell) with the URL after `--`; the URL must first pass `YoutubeUrlValidator` (host allowlist: `youtube.com`, `www.`, `m.`, `youtu.be`, `music.youtube.com`).
+- Arguments are passed as a list (no shell) with the URL after `--`; the URL must first pass `YoutubeUrlValidator`, which accepts only single-video links on `youtube.com`, `www.`, `m.`, `music.youtube.com` and `youtu.be`, and **rewrites them to `https://www.youtube.com/watch?v=<id>`** so no other part of the input reaches yt-dlp.
+- Videos rejected by `--match-filters` (live or too long) make yt-dlp exit 0 without a file; the extractor detects this and reports `LIMIT_EXCEEDED`. After a successful run only the audio file is kept (thumbnails and intermediates are deleted).
 - **Quality: speech-oriented, not best.** Default **64 kbps mono** M4A/AAC (≈ 29 MB per hour; 192 kbps would be ≈ 86 MB/hour). YouTube's own AAC is typically ~128 kbps, so 192 would only inflate the file. Configurable (`yt2pod.audio.bitrate`, `yt2pod.audio.mono`, `yt2pod.audio.format`). The target is lower than the source, so ffmpeg always re-encodes (small CPU cost).
-- Timeout and output capture; stderr is mapped to user-friendly errors (unavailable, private, age-restricted, geo-blocked).
+- Timeout and output capture; yt-dlp output is mapped to user-friendly failures (`ExtractionFailure`: unavailable, private, age-restricted, geo-blocked, bot check, limit exceeded, timeout, tool not found, unknown).
 - Drive file name collisions are resolved by suffixing.
 
 ## 8. Configuration (environment variables)
@@ -126,6 +128,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x --audio-format m4a --audio-quality 6
 | `YT2POD_JOBS_TTL` | `yt2pod.jobs.ttl` | `1h` |
 | `YT2POD_LIMITS_MAX_DURATION` | `yt2pod.limits.max-duration` | `3h` |
 | `YT2POD_YTDLP_PATH`, `YT2POD_FFMPEG_PATH` | `yt2pod.extractor.*` | `yt-dlp`, `ffmpeg` |
+| `YT2POD_EXTRACTOR_TIMEOUT` | `yt2pod.extractor.timeout` | `15m` |
 
 ## 9. Deployment
 

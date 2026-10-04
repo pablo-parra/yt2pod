@@ -48,6 +48,7 @@ public record Yt2podProperties(
 
     public record Extractor(
             @NotBlank @DefaultValue("yt-dlp") String ytDlpPath,
-            @NotBlank @DefaultValue("ffmpeg") String ffmpegPath) {
+            @NotBlank @DefaultValue("ffmpeg") String ffmpegPath,
+            @NotNull @DefaultValue("15m") Duration timeout) {
     }
 }

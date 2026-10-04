@@ -37,3 +37,4 @@ yt2pod:
   extractor:
     yt-dlp-path: ${YT2POD_YTDLP_PATH:yt-dlp}
     ffmpeg-path: ${YT2POD_FFMPEG_PATH:ffmpeg}
+    timeout: ${YT2POD_EXTRACTOR_TIMEOUT:15m}
