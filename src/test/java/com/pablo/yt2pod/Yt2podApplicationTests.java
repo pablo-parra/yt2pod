@@ -2,15 +2,18 @@ package com.pablo.yt2pod;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import com.pablo.yt2pod.config.Yt2podProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +27,10 @@ class Yt2podApplicationTests {
 
 	@Autowired
 	private Yt2podProperties properties;
+
+	@Autowired
+	@Qualifier("conversionExecutor")
+	private ThreadPoolExecutor executor;
 
 	@Test
 	@DisplayName("US-15 the service starts and reports healthy")
@@ -44,6 +51,29 @@ class Yt2podApplicationTests {
 	@DisplayName("US-01 health stays UP while Drive is not configured (Drive reported as UNKNOWN)")
 	void US01_healthIsUpWhenDriveNotConfigured() throws Exception {
 		mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("US-04 the home page has a link box and a convert button")
+	void US04_homePageHasInputAndButton() throws Exception {
+		mockMvc.perform(get("/")).andExpect(forwardedUrl("index.html")); // welcome page
+		String html = mockMvc.perform(get("/index.html")).andExpect(status().isOk()).andReturn().getResponse()
+				.getContentAsString();
+		assertThat(html).contains("<input id=\"url\" type=\"url\"").contains("<button id=\"submit\"")
+				.contains("/api/conversions");
+	}
+
+	@Test
+	@DisplayName("US-04 the home page is mobile friendly (viewport meta tag)")
+	void US04_homePageIsMobileFriendly() throws Exception {
+		String html = mockMvc.perform(get("/index.html")).andReturn().getResponse().getContentAsString();
+		assertThat(html).contains("name=\"viewport\"").contains("width=device-width");
+	}
+
+	@Test
+	@DisplayName("US-15 conversions run on a pool limited to the configured concurrency")
+	void US15_executorUsesConfiguredConcurrency() {
+		assertThat(executor.getMaximumPoolSize()).isEqualTo(properties.jobs().maxConcurrent());
 	}
 
 	@Test

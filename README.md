@@ -21,4 +21,4 @@ docker compose up --build
 
 ## Status
 
-Done: skeleton, yt-dlp extractor, one-off Google setup and Drive upload. Next: job API and web page (milestone 4), then an end-to-end run.
+Done: skeleton, yt-dlp extractor, Google setup and Drive upload, job API and web page. Next: Docker build and a real end-to-end run with Google credentials.

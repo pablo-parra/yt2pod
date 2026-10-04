@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yt2pod</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { max-width: 36rem; margin: 0 auto; padding: 1rem; }
+  form { display: flex; flex-direction: column; gap: .75rem; }
+  input, button { font-size: 1.1rem; padding: .75rem; border-radius: .5rem; border: 1px solid #888; }
+  button { cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .6; cursor: default; }
+  #message { min-height: 1.4rem; color: #c0392b; }
+  ul { list-style: none; padding: 0; }
+  li { padding: .6rem 0; border-bottom: 1px solid #8884; word-break: break-word; }
+  .status { font-weight: 600; }
+  .FAILED .status { color: #c0392b; }
+  .DONE .status { color: #2e8b57; }
+</style>
+</head>
+<body>
+<h1>yt2pod</h1>
+<form id="form">
+  <input id="url" type="url" inputmode="url" placeholder="Paste a YouTube link" autocomplete="off" required>
+  <button id="submit" type="submit">Convert to audio</button>
+</form>
+<p id="message" role="alert"></p>
+<ul id="jobs"></ul>
+<script>
+const form = document.getElementById('form');
+const urlInput = document.getElementById('url');
+const button = document.getElementById('submit');
+const message = document.getElementById('message');
+const list = document.getElementById('jobs');
+const jobs = new Map(); // jobId -> <li>; only lives in this page
+
+const LABELS = { QUEUED: 'Queued…', EXTRACTING: 'Extracting audio…', UPLOADING: 'Saving to Google Drive…',
+                 DONE: 'Done', FAILED: 'Failed' };
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  message.textContent = '';
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/conversions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlInput.value.trim() })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { message.textContent = body.error || 'The request failed.'; return; }
+    urlInput.value = '';
+    addJob(body.jobId);
+  } catch (e) {
+    message.textContent = 'Could not reach the server.';
+  } finally {
+    button.disabled = false;
+  }
+});
+
+function addJob(jobId) {
+  const li = document.createElement('li');
+  li.textContent = 'Queued…';
+  list.prepend(li);
+  jobs.set(jobId, li);
+  poll(jobId);
+}
+
+async function poll(jobId) {
+  const li = jobs.get(jobId);
+  try {
+    const response = await fetch('/api/conversions/' + encodeURIComponent(jobId));
+    if (response.status === 404) { render(li, { status: 'FAILED', error: 'The job expired.' }); return; }
+    const job = await response.json();
+    render(li, job);
+    if (job.status === 'DONE' || job.status === 'FAILED') return;
+  } catch (e) { /* keep trying */ }
+  setTimeout(() => poll(jobId), 2000);
+}
+
+function render(li, job) {
+  li.className = job.status;
+  li.replaceChildren();
+  const status = document.createElement('span');
+  status.className = 'status';
+  status.textContent = LABELS[job.status] || job.status;
+  li.append(status);
+  if (job.status === 'DONE') {
+    li.append(' — ');
+    const link = document.createElement('a');
+    link.href = job.driveLink; link.target = '_blank'; link.rel = 'noopener';
+    link.textContent = job.fileName;
+    li.append(link);
+  } else if (job.status === 'FAILED') {
+    li.append(' — ' + (job.error || 'Unknown error'));
+  }
+}
+</script>
+</body>
+</html>
