@@ -86,7 +86,7 @@ public class SetupController {
 					+ "https://myaccount.google.com/permissions and start again.");
 		}
 		return htmlPage(HttpStatus.OK, "Copy this value into GOOGLE_REFRESH_TOKEN, then restart without setup mode. "
-				+ "It is shown only once.<br><br><code>" + HtmlUtils.htmlEscape(refreshToken) + "</code>";
+				+ "It is shown only once.<br><br><code>" + HtmlUtils.htmlEscape(refreshToken) + "</code>");
 	}
 
 	private String redirectUri() {
