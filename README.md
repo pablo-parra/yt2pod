@@ -67,7 +67,7 @@ curl -X POST localhost:8081/api/conversions -H 'Content-Type: application/json' 
 curl localhost:8081/api/conversions/<jobId>          # {"status":"DONE","fileName":"...","driveLink":"..."}
 ```
 
-Statuses: `QUEUED`, `EXTRACTING`, `UPLOADING`, `DONE`, `FAILED` (with an `error` message). Accepted links: single videos on `youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`, and Shorts. Playlists and channels are rejected.
+Statuses: `QUEUED`, `EXTRACTING`, `UPLOADING`, `DONE`, `FAILED` (with an `error` message and the `failedStage` where it failed). Accepted links: single videos on `youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`, and Shorts. Playlists and channels are rejected.
 
 ## Troubleshooting
 

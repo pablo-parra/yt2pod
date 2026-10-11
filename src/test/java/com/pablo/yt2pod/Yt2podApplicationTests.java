@@ -71,6 +71,16 @@ class Yt2podApplicationTests {
 	}
 
 	@Test
+	@DisplayName("US-11 the page lists the phases (queue, download, save to Drive) with spinner, tick and cross states")
+	void US11_pageShowsPhaseChecklist() throws Exception {
+		String html = mockMvc.perform(get("/index.html")).andReturn().getResponse().getContentAsString();
+		assertThat(html).contains("Waiting in the queue", "Downloading and converting the audio",
+				"Saving to Google Drive");
+		assertThat(html).contains(".phase.running", ".phase.done", ".phase.failed", "@keyframes spin");
+		assertThat(html).contains("Done!").contains("failedStage");
+	}
+
+	@Test
 	@DisplayName("US-15 conversions run on a pool limited to the configured concurrency")
 	void US15_executorUsesConfiguredConcurrency() {
 		assertThat(executor.getMaximumPoolSize()).isEqualTo(properties.jobs().maxConcurrent());

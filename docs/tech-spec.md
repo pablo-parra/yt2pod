@@ -90,11 +90,11 @@ Flow:
 |---|---|---|
 | GET | `/` | Web page (static `index.html`): URL input + live status of the jobs submitted from that page |
 | POST | `/api/conversions` | Body `{ "url": "..." }` → `202 {jobId}`; `400` invalid URL; `429` too many jobs |
-| GET | `/api/conversions/{jobId}` | `{status, fileName?, driveLink?, error?}` |
+| GET | `/api/conversions/{jobId}` | `{status, fileName?, driveLink?, error?, failedStage?}`; `failedStage` (`QUEUED`, `EXTRACTING` or `UPLOADING`) tells which phase failed |
 | GET | `/actuator/health` | Health (includes Drive credential check) |
 | GET | `/setup/google`, `/setup/google/callback` | One-off authorization; only when `YT2POD_SETUP_ENABLED=true` |
 
-Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`.
+Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`. The web page renders them as a phase checklist derived from the current status (and `failedStage` on failure), so skipped polling intervals do not matter; each job's view is built once and updated in place so the spinner animation is not restarted.
 
 Phone/tablet clients use the web page manually (copy the link, open `http://<host>:8081`, paste, submit). Share-menu integration and shortcuts are out of scope.
 

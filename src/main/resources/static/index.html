@@ -5,18 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>yt2pod</title>
 <style>
-  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; --ok: #2e8b57; --bad: #c0392b; --muted: #888; }
   body { max-width: 36rem; margin: 0 auto; padding: 1rem; }
   form { display: flex; flex-direction: column; gap: .75rem; }
   input, button { font-size: 1.1rem; padding: .75rem; border-radius: .5rem; border: 1px solid #888; }
   button { cursor: pointer; font-weight: 600; }
   button:disabled { opacity: .6; cursor: default; }
-  #message { min-height: 1.4rem; color: #c0392b; }
-  ul { list-style: none; padding: 0; }
-  li { padding: .6rem 0; border-bottom: 1px solid #8884; word-break: break-word; }
-  .status { font-weight: 600; }
-  .FAILED .status { color: #c0392b; }
-  .DONE .status { color: #2e8b57; }
+  #message { min-height: 1.4rem; color: var(--bad); }
+  #jobs { list-style: none; padding: 0; }
+  .job { padding: .9rem 0; border-bottom: 1px solid #8884; word-break: break-word; }
+  .job h2 { font-size: .85rem; font-weight: 600; color: var(--muted); margin: 0 0 .5rem; }
+  .phases { list-style: none; padding: 0; margin: 0; }
+  .phase { display: flex; align-items: center; gap: .6rem; padding: .25rem 0; }
+  .phase .icon { width: 1.4rem; height: 1.4rem; display: inline-flex; align-items: center; justify-content: center;
+                 font-weight: 700; flex: none; }
+  .phase.pending { color: var(--muted); }
+  .phase.pending .icon::before { content: "\25CB"; }
+  .phase.done .icon { color: var(--ok); }
+  .phase.done .icon::before { content: "\2713"; }
+  .phase.failed { color: var(--bad); }
+  .phase.failed .icon::before { content: "\2717"; }
+  .phase.running .icon::before { content: ""; width: 1rem; height: 1rem; border-radius: 50%;
+                                  border: .18rem solid #8886; border-top-color: currentColor;
+                                  animation: spin .8s linear infinite; }
+  .final { margin: .6rem 0 0; font-weight: 600; }
+  .final.done { color: var(--ok); }
+  .final.failed { color: var(--bad); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .phase.running .icon::before { animation-duration: 3s; } }
 </style>
 </head>
 <body>
@@ -33,10 +49,14 @@ const urlInput = document.getElementById('url');
 const button = document.getElementById('submit');
 const message = document.getElementById('message');
 const list = document.getElementById('jobs');
-const jobs = new Map(); // jobId -> <li>; only lives in this page
+let counter = 0;
 
-const LABELS = { QUEUED: 'Queued…', EXTRACTING: 'Extracting audio…', UPLOADING: 'Saving to Google Drive…',
-                 DONE: 'Done', FAILED: 'Failed' };
+// Order of the phases = order of the job statuses reported by the API
+const PHASES = [
+  { status: 'QUEUED', label: 'Waiting in the queue' },
+  { status: 'EXTRACTING', label: 'Downloading and converting the audio' },
+  { status: 'UPLOADING', label: 'Saving to Google Drive' }
+];
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -59,40 +79,83 @@ form.addEventListener('submit', async (event) => {
 });
 
 function addJob(jobId) {
-  const li = document.createElement('li');
-  li.textContent = 'Queued…';
-  list.prepend(li);
-  jobs.set(jobId, li);
-  poll(jobId);
+  const view = createJobView();
+  list.prepend(view.root);
+  update(view, { status: 'QUEUED' });
+  poll(jobId, view);
 }
 
-async function poll(jobId) {
-  const li = jobs.get(jobId);
+async function poll(jobId, view) {
   try {
     const response = await fetch('/api/conversions/' + encodeURIComponent(jobId));
-    if (response.status === 404) { render(li, { status: 'FAILED', error: 'The job expired.' }); return; }
+    if (response.status === 404) { update(view, { status: 'FAILED', failedStage: 'QUEUED', error: 'The job expired.' }); return; }
     const job = await response.json();
-    render(li, job);
+    update(view, job);
     if (job.status === 'DONE' || job.status === 'FAILED') return;
   } catch (e) { /* keep trying */ }
-  setTimeout(() => poll(jobId), 2000);
+  setTimeout(() => poll(jobId, view), 2000);
 }
 
-function render(li, job) {
-  li.className = job.status;
-  li.replaceChildren();
-  const status = document.createElement('span');
-  status.className = 'status';
-  status.textContent = LABELS[job.status] || job.status;
-  li.append(status);
+// Built once per job and then updated in place, so the spinner animation is not restarted on every poll
+function createJobView() {
+  const root = document.createElement('li');
+  root.className = 'job';
+  const title = document.createElement('h2');
+  title.textContent = 'Conversion ' + (++counter) + ' · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const phases = document.createElement('ul');
+  phases.className = 'phases';
+  const items = PHASES.map((phase) => {
+    const li = document.createElement('li');
+    li.className = 'phase pending';
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = phase.label;
+    li.append(icon, text);
+    phases.append(li);
+    return li;
+  });
+  const final = document.createElement('p');
+  final.className = 'final';
+  final.hidden = true;
+  root.append(title, phases, final);
+  return { root, items, final };
+}
+
+function phaseStates(job) {
+  const stages = PHASES.map((p) => p.status);
+  if (job.status === 'DONE') return stages.map(() => 'done');
+  const current = job.status === 'FAILED'
+    ? Math.max(0, stages.indexOf(job.failedStage))
+    : stages.indexOf(job.status);
+  const active = job.status === 'FAILED' ? 'failed' : 'running';
+  return stages.map((_, i) => (i < current ? 'done' : i === current ? active : 'pending'));
+}
+
+const STATE_TEXT = { pending: 'not started', running: 'in progress', done: 'completed', failed: 'failed' };
+
+function update(view, job) {
+  phaseStates(job).forEach((state, i) => {
+    view.items[i].className = 'phase ' + state;
+    view.items[i].setAttribute('aria-label', PHASES[i].label + ': ' + STATE_TEXT[state]);
+  });
+  const final = view.final;
+  final.replaceChildren();
   if (job.status === 'DONE') {
-    li.append(' — ');
+    final.className = 'final done';
+    final.hidden = false;
+    final.append('Done! The audio is in your Google Drive folder, ready to import into your podcatcher: ');
     const link = document.createElement('a');
     link.href = job.driveLink; link.target = '_blank'; link.rel = 'noopener';
     link.textContent = job.fileName;
-    li.append(link);
+    final.append(link);
   } else if (job.status === 'FAILED') {
-    li.append(' — ' + (job.error || 'Unknown error'));
+    final.className = 'final failed';
+    final.hidden = false;
+    final.textContent = 'Failed: ' + (job.error || 'Unknown error');
+  } else {
+    final.hidden = true;
   }
 }
 </script>

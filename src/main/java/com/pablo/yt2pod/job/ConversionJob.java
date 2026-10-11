@@ -17,6 +17,8 @@ public class ConversionJob {
 
 	private volatile String error;
 
+	private volatile JobStatus failedStage;
+
 	ConversionJob(String id, Instant createdAt) {
 		this.id = id;
 		this.createdAt = createdAt;
@@ -46,6 +48,11 @@ public class ConversionJob {
 		return error;
 	}
 
+	/** The stage that was running when the job failed (QUEUED, EXTRACTING or UPLOADING); null otherwise. */
+	public JobStatus failedStage() {
+		return failedStage;
+	}
+
 	void extracting() {
 		status = JobStatus.EXTRACTING;
 	}
@@ -61,6 +68,7 @@ public class ConversionJob {
 	}
 
 	void failed(String error) {
+		this.failedStage = status;
 		this.error = error;
 		status = JobStatus.FAILED;
 	}

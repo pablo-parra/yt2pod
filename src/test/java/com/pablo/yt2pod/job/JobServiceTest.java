@@ -180,6 +180,32 @@ class JobServiceTest {
 	}
 
 	@Test
+	@DisplayName("US-11 a failed extraction records that it failed during EXTRACTING (for the UI phase list)")
+	void US11_failedStageIsExtracting() {
+		extractionFailure = new ExtractionException(ExtractionFailure.PRIVATE);
+		ConversionJob job = submit(URL);
+		executor.runAll();
+		assertThat(job.failedStage()).isEqualTo(JobStatus.EXTRACTING);
+	}
+
+	@Test
+	@DisplayName("US-11 a failed upload records that it failed during UPLOADING (for the UI phase list)")
+	void US11_failedStageIsUploading() {
+		uploadFailure = new DriveUploadException(new IOException("boom"));
+		ConversionJob job = submit(URL);
+		executor.runAll();
+		assertThat(job.failedStage()).isEqualTo(JobStatus.UPLOADING);
+	}
+
+	@Test
+	@DisplayName("US-11 a successful job has no failed stage")
+	void US11_successHasNoFailedStage() {
+		ConversionJob job = submit(URL);
+		executor.runAll();
+		assertThat(job.failedStage()).isNull();
+	}
+
+	@Test
 	@DisplayName("US-14 a video over the duration limit fails with the limit message")
 	void US14_limitExceededIsReported() {
 		extractionFailure = new ExtractionException(ExtractionFailure.LIMIT_EXCEEDED);

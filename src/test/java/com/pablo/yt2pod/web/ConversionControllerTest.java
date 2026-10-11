@@ -128,7 +128,15 @@ class ConversionControllerTest {
 		String id = submitAndGetId(GOOD);
 		mvc.perform(get("/api/conversions/" + id)).andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("FAILED")).andExpect(jsonPath("$.error").value("The video is private."))
+				.andExpect(jsonPath("$.failedStage").value("EXTRACTING"))
 				.andExpect(jsonPath("$.fileName").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("US-11 a successful job has no failedStage in the response")
+	void US11_successHasNoFailedStage() throws Exception {
+		String id = submitAndGetId(GOOD);
+		mvc.perform(get("/api/conversions/" + id)).andExpect(jsonPath("$.failedStage").doesNotExist());
 	}
 
 	@Test

@@ -73,6 +73,7 @@ As the Owner, I want the file tagged with title, channel (as artist) and thumbna
 
 ### US-11 Job status (M)
 As a Client, I want to see whether my conversion is queued, running, done or failed, so I know when the file is in Drive.
+- The page shows the phases as a checklist (waiting in the queue, downloading and converting the audio, saving to Google Drive): a spinner next to the running phase, a green tick when it completes, a red cross if it fails, and a final message when everything is done.
 - On success: Drive file name and a link.
 - On failure: a human-readable reason (video unavailable, Drive error, authorization revoked…).
 

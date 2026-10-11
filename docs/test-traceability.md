@@ -16,7 +16,7 @@ Every test is named with the user story it verifies (`USxx_...` method names and
 | US-08 Speech-oriented format | covered | `YtDlpCommandBuilderTest.US08_*`, `Yt2podApplicationTests.US08_US15_*` |
 | US-09 Drive folder | covered (against a fake Google) | `GoogleDriveUploaderTest.US09_*`, `GoogleDriveGatewayTest.US09_*`, `JobServiceTest.US09_*` |
 | US-10 Embedded metadata | covered (command flags) | `YtDlpCommandBuilderTest.US10_*` |
-| US-11 Job status / failure reasons | covered | `JobServiceTest.US11_*`, `ConversionControllerTest.US11_*`, `YtDlpAudioExtractorTest.US11_*` |
+| US-11 Job status / failure reasons | covered | `JobServiceTest.US11_*`, `ConversionControllerTest.US11_*`, `YtDlpAudioExtractorTest.US11_*`, `Yt2podApplicationTests.US11_*` (page markup; the spinner/tick/cross rendering was checked visually in a browser) |
 | US-12 Resilience to YouTube changes | covered | `YtDlpCommandBuilderTest.US12_*`, `YtDlpAudioExtractorTest.US12_*`, `DefaultProcessRunnerTest.US12_*` |
 | US-13 Playlists (could) | rejection covered | `YoutubeUrlValidatorTest.US13_*`, `YtDlpCommandBuilderTest.US13_*`; batch support not planned yet |
 | US-14 Duration limit (could) | covered | `YtDlpCommandBuilderTest.US14_*`, `YtDlpAudioExtractorTest.US14_*`, `JobServiceTest.US14_*` |
