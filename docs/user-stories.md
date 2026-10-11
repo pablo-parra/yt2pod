@@ -33,7 +33,7 @@ As the Owner, I want the service to renew Google access tokens by itself, so I n
 
 ### US-04 Submit a link through a web page (M)
 As a Client, I want a simple page where I paste a YouTube URL and press a button, so I can convert a video from any device without logging in.
-- On a phone or tablet the flow is manual: copy the link, open `http://<host>:8080`, paste it and press the button.
+- On a phone or tablet the flow is manual: copy the link, open `http://<host>:8081`, paste it and press the button.
 - Works well on mobile browsers.
 
 ### US-05 Submit a link through an API (M)

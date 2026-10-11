@@ -3,7 +3,7 @@ services:
     build: .
     image: yt2pod:local
     env_file: .env
-    # Normal use: reachable from the LAN. For the one-off Google setup use "127.0.0.1:8080:8080"
+    # Host port 8081 (the app listens on 8080 inside the container); change it with YT2POD_PORT
     ports:
-      - "8080:8080"
+      - "${YT2POD_PORT:-8081}:8080"
     restart: unless-stopped

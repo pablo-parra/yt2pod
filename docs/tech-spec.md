@@ -44,7 +44,7 @@ Clients are anonymous; only the **service** authenticates to Google, as the Owne
 - **Upload:** `Drive.Files.create` with `InputStreamContent`, resumable upload.
 - **Obtaining the refresh token (one-off, US-01):**
   1. In Google Cloud (free, no billing needed): create a project, enable the **Google Drive API**, configure **Google Auth Platform** (audience *External*, your account as test user; "Interno" is only available for Google Workspace organizations), and create an OAuth client of type *Web application* with redirect URI `http://localhost:8080/setup/google/callback`. Put the client ID/secret in `.env`.
-  2. Start the service in setup mode on the machine whose browser you will use: `set -a && source .env && set +a && YT2POD_SETUP_ENABLED=true ./mvnw spring-boot:run` (as done in practice), or a container with the port bound to localhost only (`-p 127.0.0.1:8080:8080`).
+  2. Start the service in setup mode on the machine whose browser you will use: `set -a && source .env && set +a && YT2POD_SETUP_ENABLED=true ./mvnw spring-boot:run` (as done in practice), or a container with the port bound to localhost only (`-p 127.0.0.1:8080:8080`). Port 8080 must be free during the setup.
   3. Open `http://localhost:8080/setup/google` in the host's browser, sign in with the Drive account, approve (an "unverified app" warning appears: **Advanced → Go to yt2pod**). The app requests `access_type=offline` and `prompt=consent` so Google returns a refresh token.
   4. The callback page shows the refresh token **once**; copy it into the `GOOGLE_REFRESH_TOKEN` environment variable and restart without setup mode.
   - Google accepts plain `http` redirect URIs only for `localhost`, which is why setup is done on the host. Normal use afterwards involves no redirect at all.
@@ -96,7 +96,7 @@ Flow:
 
 Job states: `QUEUED → EXTRACTING → UPLOADING → DONE | FAILED`.
 
-Phone/tablet clients use the web page manually (copy the link, open `http://<host>:8080`, paste, submit). Share-menu integration and shortcuts are out of scope.
+Phone/tablet clients use the web page manually (copy the link, open `http://<host>:8081`, paste, submit). Share-menu integration and shortcuts are out of scope.
 
 ## 7. yt-dlp invocation
 
@@ -133,7 +133,7 @@ yt-dlp --no-playlist -f "bestaudio/best" -x \
 
 ## 9. Deployment
 
-- **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, port 8080 published to the LAN; clients use `http://<host-ip-or-name>:8080`. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so the address stays stable. **Never port-forward this service to the internet** (it has no authentication).
+- **Phase 1 — MVP, LAN self-hosted (plain HTTP):** `docker compose` on an always-on computer, host port 8081 (mapped to 8080 inside the container, configurable with `YT2POD_PORT`) published to the LAN; clients use `http://<host-ip-or-name>:8081`. The one-off setup runs on 8080 outside Docker, so the Google redirect URI keeps port 8080. Only outbound internet access is needed (Google, YouTube). No domain, certificate or proxy. Run the one-off setup first (§3) with the port bound to `127.0.0.1`, then restart in normal mode with the refresh token set. Give the host a fixed IP or local hostname so the address stays stable. **Never port-forward this service to the internet** (it has no authentication).
 - **Phase 2 — Cloud (later, optional):** same image behind HTTPS with access control added (not designed here). YouTube may block datacenter IPs, possibly requiring a cookies/PO-token provider — validate early. In-memory jobs imply a single instance.
 - **Possible future HTTPS for LAN:** own domain + Caddy with a Let's Encrypt DNS-01 certificate. Not needed for the MVP.
 

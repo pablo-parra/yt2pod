@@ -2,7 +2,7 @@
 
 Self-hosted service that extracts the **audio** of a YouTube video and saves it to a **Google Drive** folder, ready to be imported into a podcatcher app. For personal use on a private network.
 
-1. Open `http://<server>:8080` from any device on your LAN (no login, nothing to install).
+1. Open `http://<server>:8081` from any device on your LAN (no login, nothing to install).
 2. Paste a YouTube link and press **Convert to audio**.
 3. The file (M4A, 64 kbps mono by default) appears in the `yt2pod` folder of your Drive; import it into your podcatcher manually.
 
@@ -25,16 +25,16 @@ The service writes to Drive with an OAuth refresh token that you create once.
    ```bash
    set -a && source .env && set +a && YT2POD_SETUP_ENABLED=true ./mvnw spring-boot:run
    ```
-   Open `http://localhost:8080/setup/google` (it must be `localhost`), sign in, accept the "unverified app" warning (**Advanced → Go to yt2pod**) and approve. Copy the refresh token shown (only once) into `GOOGLE_REFRESH_TOKEN` in `.env`, then stop the app with Ctrl+C.
+   Open `http://localhost:8080/setup/google` (it must be `localhost`), sign in, accept the "unverified app" warning (**Advanced → Go to yt2pod**) and approve. Copy the refresh token shown (only once) into `GOOGLE_REFRESH_TOKEN` in `.env`, then stop the app with Ctrl+C. (The setup runs outside Docker on port 8080, so that port must be free during the setup; the redirect URI above is for that.)
 
 ### 2. Run
 
 ```bash
 docker compose up -d --build
-curl localhost:8080/actuator/health
+curl localhost:8081/actuator/health
 ```
 
-Open `http://localhost:8080`. To use it from a phone or tablet on the same Wi-Fi, open `http://<server-LAN-ip>:8080` (e.g. `ipconfig getifaddr en0` on macOS). Give the server a fixed IP in your router so the address does not change.
+Open `http://localhost:8081` (the container listens on 8080 internally; the host port is `8081`, change it with `YT2POD_PORT` in `.env`). To use it from a phone or tablet on the same Wi-Fi, open `http://<server-LAN-ip>:8081` (e.g. `ipconfig getifaddr en0` on macOS). Give the server a fixed IP in your router so the address does not change.
 
 Update yt-dlp (YouTube changes often) by rebuilding the image: `docker compose build --no-cache && docker compose up -d`.
 
@@ -62,9 +62,9 @@ All settings are environment variables (put them in `.env`).
 ## API
 
 ```bash
-curl -X POST localhost:8080/api/conversions -H 'Content-Type: application/json' \
+curl -X POST localhost:8081/api/conversions -H 'Content-Type: application/json' \
      -d '{"url":"https://youtu.be/<id>"}'          # 202 {"jobId":"..."}
-curl localhost:8080/api/conversions/<jobId>          # {"status":"DONE","fileName":"...","driveLink":"..."}
+curl localhost:8081/api/conversions/<jobId>          # {"status":"DONE","fileName":"...","driveLink":"..."}
 ```
 
 Statuses: `QUEUED`, `EXTRACTING`, `UPLOADING`, `DONE`, `FAILED` (with an `error` message). Accepted links: single videos on `youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`, and Shorts. Playlists and channels are rejected.
